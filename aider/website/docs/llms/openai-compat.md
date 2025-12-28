@@ -11,9 +11,35 @@ First, install aider:
 
 {% include install.md %}
 
-Then configure your API key and endpoint:
+## Simple configuration (environment variables only)
 
+For the simplest setup, configure your API connection using only environment variables:
+
+```bash
+# Mac/Linux:
+export OPENAI_API_BASE=<endpoint>
+export OPENAI_API_KEY=<key>
+export MODEL=openai/<model-name>
+
+# Windows:
+setx OPENAI_API_BASE <endpoint>
+setx OPENAI_API_KEY <key>
+setx MODEL openai/<model-name>
+# ... restart shell after setx commands
 ```
+
+Then start aider in your codebase without any additional arguments:
+
+```bash
+cd /to/your/project
+aider
+```
+
+## Using command line arguments
+
+Alternatively, you can set the API endpoint via environment variables and specify the model on the command line:
+
+```bash
 # Mac/Linux:
 export OPENAI_API_BASE=<endpoint>
 export OPENAI_API_KEY=<key>

@@ -129,6 +129,13 @@ def select_default_model(args, io, analytics):
     if args.model:
         return args.model  # Model already specified
 
+    # Check for MODEL environment variable (simpler alternative to AIDER_MODEL)
+    model_from_env = os.environ.get("MODEL")
+    if model_from_env:
+        io.tool_warning(f"Using {model_from_env} model from MODEL environment variable.")
+        analytics.event("model_from_env", model=model_from_env)
+        return model_from_env
+
     model = try_to_select_default_model()
     if model:
         io.tool_warning(f"Using {model} model with API key from environment.")

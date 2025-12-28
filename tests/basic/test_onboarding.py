@@ -298,6 +298,27 @@ class TestOnboarding(unittest.TestCase):
         mock_try_select.assert_not_called()
         mock_offer_oauth.assert_not_called()
 
+    @patch("aider.onboarding.try_to_select_default_model", return_value=None)
+    @patch("aider.onboarding.offer_openrouter_oauth")
+    @patch.dict(os.environ, {"MODEL": "openai/custom-model"}, clear=True)
+    def test_select_default_model_from_model_env_var(self, mock_offer_oauth, mock_try_select):
+        """Test select_default_model returns model from MODEL env var."""
+        args = argparse.Namespace(model=None)
+        io_mock = DummyIO()
+        io_mock.tool_warning = MagicMock()
+        analytics_mock = DummyAnalytics()
+        analytics_mock.event = MagicMock()
+        
+        selected_model = select_default_model(args, io_mock, analytics_mock)
+        
+        self.assertEqual(selected_model, "openai/custom-model")
+        mock_try_select.assert_not_called()
+        io_mock.tool_warning.assert_called_once_with(
+            "Using openai/custom-model model from MODEL environment variable."
+        )
+        analytics_mock.event.assert_called_once_with("model_from_env", model="openai/custom-model")
+        mock_offer_oauth.assert_not_called()
+
     @patch("aider.onboarding.try_to_select_default_model", return_value="gpt-4o")
     @patch("aider.onboarding.offer_openrouter_oauth")
     def test_select_default_model_found_via_env(self, mock_offer_oauth, mock_try_select):
