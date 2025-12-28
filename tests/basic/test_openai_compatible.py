@@ -1,6 +1,4 @@
-import os
 from pathlib import Path
-from unittest.mock import Mock
 
 from aider.models import get_openai_compatible_models
 from aider.openai_compatible import OpenAICompatibleModelManager
@@ -138,15 +136,15 @@ def test_openai_compatible_caching(monkeypatch, tmp_path):
     monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
 
     manager = OpenAICompatibleModelManager()
-    
+
     # First call should fetch from API
     models1 = manager.get_models("https://api.example.com/v1")
     assert call_count == 1
-    
+
     # Second call should use cache
     models2 = manager.get_models("https://api.example.com/v1")
     assert call_count == 1  # Should not have made another API call
-    
+
     assert models1 == models2
 
 
@@ -169,7 +167,7 @@ def test_get_openai_compatible_models_with_env(monkeypatch, tmp_path):
     models.model_info_manager.openai_compatible_manager = OpenAICompatibleModelManager()
 
     fetched_models = get_openai_compatible_models()
-    
+
     assert len(fetched_models) == 1
     assert "env-model" in fetched_models
 
@@ -181,7 +179,7 @@ def test_get_openai_compatible_models_without_env(monkeypatch):
     monkeypatch.delenv("OPENAI_API_BASE", raising=False)
 
     fetched_models = get_openai_compatible_models()
-    
+
     assert fetched_models == []
 
 
