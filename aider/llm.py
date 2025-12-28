@@ -17,6 +17,9 @@ os.environ["LITELLM_MODE"] = "PRODUCTION"
 
 VERBOSE = False
 
+# Global flag to control whether to use SimpleLLM or LiteLLM
+USE_LITELLM = os.environ.get("AIDER_USE_LITELLM", "").lower() == "true"
+
 
 class LazyLiteLLM:
     _lazy_module = None
@@ -42,6 +45,24 @@ class LazyLiteLLM:
         self._lazy_module._logging._disable_debugging()
 
 
-litellm = LazyLiteLLM()
+class LLMProxy:
+    """Proxy that delegates to either SimpleLLM or LiteLLM based on USE_LITELLM flag"""
+    
+    _lazy_litellm = None
+    _simple_llm = None
+    
+    def __getattr__(self, name):
+        if USE_LITELLM:
+            if self._lazy_litellm is None:
+                self._lazy_litellm = LazyLiteLLM()
+            return getattr(self._lazy_litellm, name)
+        else:
+            if self._simple_llm is None:
+                from aider import simple_llm
+                self._simple_llm = simple_llm
+            return getattr(self._simple_llm, name)
+
+
+litellm = LLMProxy()
 
 __all__ = [litellm]

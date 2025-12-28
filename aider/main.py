@@ -633,6 +633,18 @@ def main(argv=None, input=None, output=None, force_git_root=None, return_coder=F
         )
         os.environ["OPENAI_ORGANIZATION"] = args.openai_organization_id
 
+    # Handle max_tokens setting
+    if args.max_tokens:
+        os.environ["MAX_TOKENS"] = str(args.max_tokens)
+    
+    # Handle use_litellm flag
+    if args.use_litellm:
+        os.environ["AIDER_USE_LITELLM"] = "true"
+    
+    # Set verify_ssl environment for SimpleLLM
+    if not args.verify_ssl:
+        os.environ["AIDER_VERIFY_SSL"] = "false"
+
     analytics = Analytics(
         logfile=args.analytics_log,
         permanently_disable=args.analytics_disable,
