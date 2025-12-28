@@ -22,6 +22,19 @@ If the files above exist, they will be loaded in that order. Files loaded last w
 
 {% include keys.md %}
 
+## Simple configuration for OpenAI-compatible APIs
+
+For OpenAI-compatible API servers, you can use a minimal configuration with just three environment variables:
+
+```bash
+# .env file for OpenAI-compatible API
+OPENAI_API_BASE=https://api.example.com/v1
+OPENAI_API_KEY=your-api-key-here
+MODEL=openai/your-model-name
+```
+
+This is simpler than using the `AIDER_` prefixed variables and doesn't require command-line arguments or complex configuration files. Just set these three variables and run `aider` in your project directory.
+
 ## Sample .env file
 
 Below is a sample `.env` file, which you
@@ -63,6 +76,10 @@ cog.outl("```")
 
 ## Specify the model to use for the main chat
 #AIDER_MODEL=
+
+## Simple alternative: Use MODEL env var (without AIDER_ prefix)
+## Useful for OpenAI-compatible APIs
+#MODEL=
 
 ########################
 # API Keys and settings:
