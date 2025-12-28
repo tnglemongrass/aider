@@ -51,6 +51,12 @@ class LLMProxy:
     _lazy_litellm = None
     _simple_llm = None
     
+    def _load_litellm(self):
+        """Compatibility method for tests that patch this"""
+        if self._lazy_litellm is None:
+            self._lazy_litellm = LazyLiteLLM()
+        return self._lazy_litellm._load_litellm()
+    
     def __getattr__(self, name):
         # Special handling for _lazy_module check
         if name == "_lazy_module":

@@ -520,9 +520,11 @@ def main(argv=None, input=None, output=None, force_git_root=None, return_coder=F
         import httpx
 
         os.environ["SSL_VERIFY"] = ""
-        litellm._load_litellm()
-        litellm._lazy_module.client_session = httpx.Client(verify=False)
-        litellm._lazy_module.aclient_session = httpx.AsyncClient(verify=False)
+        # Only set client sessions if using LiteLLM
+        if os.environ.get("AIDER_USE_LITELLM", "").lower() == "true":
+            litellm._load_litellm()
+            litellm._lazy_module.client_session = httpx.Client(verify=False)
+            litellm._lazy_module.aclient_session = httpx.AsyncClient(verify=False)
         # Set verify_ssl on the model_info_manager
         models.model_info_manager.set_verify_ssl(False)
 
