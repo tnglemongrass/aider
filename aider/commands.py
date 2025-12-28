@@ -1411,6 +1411,61 @@ class Commands:
         if repo_map:
             self.io.tool_output("The repo map has been refreshed, use /map to view it.")
 
+    def cmd_map_tokens(self, args):
+        "Set the map token budget (eg: 2048, 4k), or 0 to disable"
+
+        if not args.strip():
+            # Display current value if no args are provided
+            if self.coder.repo_map:
+                map_tokens = self.coder.repo_map.max_map_tokens
+                if map_tokens > 0:
+                    self.io.tool_output(f"Current map token budget: {map_tokens:,} tokens.")
+                else:
+                    self.io.tool_output("Repo map is currently disabled (map-tokens: 0).")
+            else:
+                self.io.tool_output("Repo map is not available.")
+            return
+
+        value = args.strip()
+        
+        # Parse the value (support formats like "2048", "4k", "1.5k")
+        try:
+            if value.lower().endswith('k'):
+                # Parse values like "4k", "1.5k"
+                numeric_part = value[:-1]
+                map_tokens = int(float(numeric_part) * 1024)
+            elif value.lower().endswith('m'):
+                # Parse values like "1m", "0.5m"
+                numeric_part = value[:-1]
+                map_tokens = int(float(numeric_part) * 1024 * 1024)
+            else:
+                map_tokens = int(value)
+        except ValueError:
+            self.io.tool_error(f"Invalid map token value: {value}")
+            return
+
+        # Ensure non-negative
+        if map_tokens < 0:
+            self.io.tool_error("Map token value must be non-negative.")
+            return
+
+        # Update the repo_map if it exists
+        if self.coder.repo_map:
+            self.coder.repo_map.max_map_tokens = map_tokens
+            if map_tokens == 0:
+                self.io.tool_output("Repo map disabled (map-tokens set to 0).")
+            else:
+                self.io.tool_output(f"Set map token budget to {map_tokens:,} tokens.")
+        else:
+            self.io.tool_output("Repo map is not available.")
+            return
+
+        self.io.tool_output()
+
+        # Output announcements
+        announcements = "\n".join(self.coder.get_announcements())
+        self.io.tool_output(announcements)
+
     def cmd_settings(self, args):
         "Print out the current settings"
         settings = format_settings(self.parser, self.args)
