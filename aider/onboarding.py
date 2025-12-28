@@ -127,9 +127,10 @@ def select_default_model(args, io, analytics):
         The name of the selected model, or None if no suitable default is found.
     """
     if args.model:
-        return args.model  # Model already specified
+        return args.model  # Model already specified (includes AIDER_MODEL from env)
 
-    # Check for MODEL environment variable (simpler alternative to AIDER_MODEL)
+    # Check for MODEL environment variable (simpler alternative without AIDER_ prefix)
+    # This is checked AFTER args.model so that AIDER_MODEL (processed by configargparse) takes precedence
     model_from_env = os.environ.get("MODEL")
     if model_from_env:
         io.tool_warning(f"Using {model_from_env} model from MODEL environment variable.")

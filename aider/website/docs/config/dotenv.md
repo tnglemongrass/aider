@@ -35,6 +35,8 @@ MODEL=openai/your-model-name
 
 This is simpler than using the `AIDER_` prefixed variables and doesn't require command-line arguments or complex configuration files. Just set these three variables and run `aider` in your project directory.
 
+**Note:** If both `AIDER_MODEL` and `MODEL` are set, `AIDER_MODEL` takes precedence. The `--model` command-line argument takes highest precedence over both.
+
 ## Sample .env file
 
 Below is a sample `.env` file, which you
