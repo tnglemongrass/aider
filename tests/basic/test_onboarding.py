@@ -319,6 +319,24 @@ class TestOnboarding(unittest.TestCase):
         analytics_mock.event.assert_called_once_with("model_from_env", model="openai/custom-model")
         mock_offer_oauth.assert_not_called()
 
+    @patch("aider.onboarding.try_to_select_default_model", return_value="gpt-4o")
+    @patch("aider.onboarding.offer_openrouter_oauth")
+    @patch.dict(os.environ, {"MODEL": "   "}, clear=True)
+    def test_select_default_model_model_env_var_empty_whitespace(self, mock_offer_oauth, mock_try_select):
+        """Test that empty/whitespace MODEL env var is ignored."""
+        args = argparse.Namespace(model=None)
+        io_mock = DummyIO()
+        io_mock.tool_warning = MagicMock()
+        analytics_mock = DummyAnalytics()
+        analytics_mock.event = MagicMock()
+        
+        selected_model = select_default_model(args, io_mock, analytics_mock)
+        
+        # Should fall through to try_to_select_default_model since MODEL is whitespace
+        self.assertEqual(selected_model, "gpt-4o")
+        mock_try_select.assert_called_once()
+        mock_offer_oauth.assert_not_called()
+
     @patch("aider.onboarding.try_to_select_default_model", return_value=None)
     @patch("aider.onboarding.offer_openrouter_oauth")
     @patch.dict(os.environ, {"MODEL": "openai/from-model", "AIDER_MODEL": "openai/from-aider"}, clear=True)

@@ -131,7 +131,7 @@ def select_default_model(args, io, analytics):
 
     # Check for MODEL environment variable (simpler alternative without AIDER_ prefix)
     # This is checked AFTER args.model so that AIDER_MODEL (processed by configargparse) takes precedence
-    model_from_env = os.environ.get("MODEL")
+    model_from_env = os.environ.get("MODEL", "").strip()
     if model_from_env:
         io.tool_warning(f"Using {model_from_env} model from MODEL environment variable.")
         analytics.event("model_from_env", model=model_from_env)
