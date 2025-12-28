@@ -106,12 +106,8 @@ class ModelInfo:
         except OSError:
             pass
         
-        # Return info for requested model or defaults
-        return self._cache.get(cache_key, {
-            "max_tokens": 4096,
-            "max_input_tokens": 4096,
-            "max_output_tokens": 4096,
-        })
+        # Return info for requested model or empty dict if not found
+        return self._cache.get(cache_key, {})
 
 
 # Global model info cache

@@ -52,6 +52,16 @@ class LLMProxy:
     _simple_llm = None
     
     def __getattr__(self, name):
+        # Special handling for _lazy_module check
+        if name == "_lazy_module":
+            if USE_LITELLM:
+                if self._lazy_litellm is None:
+                    self._lazy_litellm = LazyLiteLLM()
+                return self._lazy_litellm._lazy_module
+            else:
+                # SimpleLLM doesn't have _lazy_module, return None
+                return None
+        
         if USE_LITELLM:
             if self._lazy_litellm is None:
                 self._lazy_litellm = LazyLiteLLM()
