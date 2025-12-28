@@ -463,6 +463,10 @@ def main(argv=None, input=None, output=None, force_git_root=None, return_coder=F
 
     conf_fname = Path(".aider.conf.yml")
 
+    # Check for AIDER_CONFIG environment variable
+    # This allows specifying config file via env var for consistency with other options
+    env_config_file = os.environ.get("AIDER_CONFIG")
+    
     default_config_files = []
     try:
         default_config_files += [conf_fname.resolve()]  # CWD
@@ -474,6 +478,16 @@ def main(argv=None, input=None, output=None, force_git_root=None, return_coder=F
         if git_conf not in default_config_files:
             default_config_files.append(git_conf)
     default_config_files.append(Path.home() / conf_fname)  # homedir
+    
+    # Add env-specified config file if provided
+    if env_config_file:
+        try:
+            env_conf = Path(env_config_file).resolve()
+            if env_conf not in default_config_files:
+                default_config_files.append(env_conf)
+        except OSError:
+            pass
+    
     default_config_files = list(map(str, default_config_files))
 
     parser = get_parser(default_config_files, git_root)
@@ -614,6 +628,12 @@ def main(argv=None, input=None, output=None, force_git_root=None, return_coder=F
 
     if args.openai_api_key:
         os.environ["OPENAI_API_KEY"] = args.openai_api_key
+
+    if args.openrouter_api_key:
+        os.environ["OPENROUTER_API_KEY"] = args.openrouter_api_key
+
+    if args.docker_image:
+        os.environ["AIDER_DOCKER_IMAGE"] = args.docker_image
 
     # Handle deprecated model shortcut args
     handle_deprecated_model_args(args, io)
@@ -953,6 +973,9 @@ def main(argv=None, input=None, output=None, force_git_root=None, return_coder=F
 
     if args.cache_prompts and args.map_refresh == "auto":
         args.map_refresh = "files"
+
+    if args.cache_keepalive_delay is not None:
+        os.environ["AIDER_CACHE_KEEPALIVE_DELAY"] = str(args.cache_keepalive_delay)
 
     if not main_model.streaming:
         if args.stream:
