@@ -769,6 +769,17 @@ class Model(ModelSettings):
                     self.extra_params["extra_body"] = {}
                 self.extra_params["extra_body"]["reasoning_effort"] = effort
 
+    def set_max_tokens(self, value):
+        """
+        Set the maximum number of output tokens for model responses.
+        Accepts formats: 4096, "4k", "10.5k", "0.5M", "10K", etc.
+        """
+        if value is not None:
+            num_tokens = self.parse_token_value(value)
+            if not self.extra_params:
+                self.extra_params = {}
+            self.extra_params["max_tokens"] = num_tokens
+
     def parse_token_value(self, value):
         """
         Parse a token value string into an integer.

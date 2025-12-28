@@ -1186,6 +1186,25 @@ class TestMain(TestCase):
             coder.main_model.extra_params.get("thinking", {}).get("budget_tokens"), 1000
         )
 
+    def test_max_tokens_option(self):
+        # Test with integer value
+        coder = main(
+            ["--model", "gpt-4o", "--max-tokens", "4096", "--yes", "--exit"],
+            input=DummyInput(),
+            output=DummyOutput(),
+            return_coder=True,
+        )
+        self.assertEqual(coder.main_model.extra_params.get("max_tokens"), 4096)
+
+        # Test with "k" format
+        coder = main(
+            ["--model", "gpt-4o", "--max-tokens", "8k", "--yes", "--exit"],
+            input=DummyInput(),
+            output=DummyOutput(),
+            return_coder=True,
+        )
+        self.assertEqual(coder.main_model.extra_params.get("max_tokens"), 8192)
+
     def test_list_models_includes_metadata_models(self):
         # Test that models from model-metadata.json appear in list-models output
         with GitTemporaryDirectory():

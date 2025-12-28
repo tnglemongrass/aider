@@ -848,6 +848,12 @@ def main(argv=None, input=None, output=None, force_git_root=None, return_coder=F
         ):
             main_model.set_thinking_tokens(args.thinking_tokens)
 
+    # Set max_tokens if specified
+    # Note: max_tokens is a standard parameter widely supported by most LLM providers
+    # (OpenAI, Anthropic, etc.) so we don't validate it like model-specific settings
+    if args.max_tokens is not None:
+        main_model.set_max_tokens(args.max_tokens)
+
     # Show warnings about unsupported settings that are being ignored
     if args.check_model_accepts_settings:
         settings_to_check = [
