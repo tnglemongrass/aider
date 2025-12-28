@@ -6,11 +6,12 @@ when the user specifies a custom API base URL via OPENAI_API_BASE or --openai-ap
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import time
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional, Tuple
 
 import requests
 
@@ -24,7 +25,7 @@ class OpenAICompatibleModelManager:
         self.cache_dir = Path.home() / ".aider" / "caches"
         self.cache_file_prefix = "openai_compatible_models"
         self.verify_ssl: bool = True
-        self._models_cache: Dict[str, tuple[List[str], float]] = {}
+        self._models_cache: Dict[str, Tuple[List[str], float]] = {}
 
     def set_verify_ssl(self, verify_ssl: bool) -> None:
         """Enable/disable SSL verification for API requests."""
@@ -99,11 +100,10 @@ class OpenAICompatibleModelManager:
     def _get_cache_file(self, api_base: str) -> Path:
         """Get the cache file path for a given API base URL."""
         # Create a safe filename from the URL
-        import hashlib
         url_hash = hashlib.md5(api_base.encode()).hexdigest()[:16]
         return self.cache_dir / f"{self.cache_file_prefix}_{url_hash}.json"
 
-    def _load_cache(self, api_base: str) -> List[str] | None:
+    def _load_cache(self, api_base: str) -> Optional[List[str]]:
         """Load cached models from disk."""
         try:
             self.cache_dir.mkdir(parents=True, exist_ok=True)
