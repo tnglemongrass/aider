@@ -54,7 +54,8 @@ class ModelInfo:
                         return data["data"]
                     elif isinstance(data, list):
                         return data
-            except Exception:
+            except (requests.exceptions.RequestException, requests.exceptions.Timeout) as e:
+                # Try next endpoint if this one fails
                 continue
         
         return []
@@ -81,7 +82,8 @@ class ModelInfo:
                         if model_name in cached_data:
                             self._cache[cache_key] = cached_data[model_name]
                             return cached_data[model_name]
-            except (json.JSONDecodeError, OSError):
+            except (json.JSONDecodeError, OSError) as e:
+                # Ignore cache read errors and fetch fresh data
                 pass
         
         # Fetch fresh data
@@ -103,7 +105,8 @@ class ModelInfo:
         try:
             with open(cache_file, "w") as f:
                 json.dump(model_cache, f, indent=2)
-        except OSError:
+        except OSError as e:
+            # Ignore cache write errors - we can still use memory cache
             pass
         
         # Return info for requested model or empty dict if not found
@@ -283,7 +286,8 @@ class StreamingResponse:
             try:
                 chunk = json.loads(line)
                 yield StreamChunk(chunk)
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as e:
+                # Skip invalid JSON chunks - some servers send comments or metadata
                 continue
 
 
@@ -369,10 +373,11 @@ def encode(model: str, text: str) -> List[int]:
     Tokenize text (simple approximation).
     
     For SimpleLLM, we use a rough approximation: ~4 chars per token.
-    This is good enough for most purposes.
+    This is good enough for most purposes. Returns sequential IDs for debugging.
     """
-    # Rough approximation: 4 characters per token
-    return [0] * (len(text) // 4 + 1)
+    # Rough approximation: 4 characters per token, return sequential IDs
+    num_tokens = len(text) // 4 + 1
+    return list(range(num_tokens))
 
 
 def token_counter(model: str, messages: List[Dict]) -> int:

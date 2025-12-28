@@ -81,4 +81,4 @@ class LLMProxy:
 
 litellm = LLMProxy()
 
-__all__ = [litellm]
+__all__ = ['litellm']

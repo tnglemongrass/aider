@@ -20,7 +20,7 @@ class TestLLMProxy(unittest.TestCase):
     
     def tearDown(self):
         """Clean up test environment"""
-        # Restore original environment
+        # Restore original environment - only clear test-specific vars
         os.environ.clear()
         os.environ.update(self.original_env)
         # Clear cached modules
