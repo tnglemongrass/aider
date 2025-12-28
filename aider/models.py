@@ -19,6 +19,7 @@ from PIL import Image
 from aider import __version__
 from aider.dump import dump  # noqa: F401
 from aider.llm import litellm
+from aider.openai_compatible import OpenAICompatibleModelManager
 from aider.openrouter import OpenRouterModelManager
 from aider.sendchat import ensure_alternating_roles, sanity_check_messages
 from aider.utils import check_pip_install_extra
@@ -158,11 +159,16 @@ class ModelInfoManager:
 
         # Manager for the cached OpenRouter model database
         self.openrouter_manager = OpenRouterModelManager()
+        
+        # Manager for OpenAI-compatible endpoints
+        self.openai_compatible_manager = OpenAICompatibleModelManager()
 
     def set_verify_ssl(self, verify_ssl):
         self.verify_ssl = verify_ssl
         if hasattr(self, "openrouter_manager"):
             self.openrouter_manager.set_verify_ssl(verify_ssl)
+        if hasattr(self, "openai_compatible_manager"):
+            self.openai_compatible_manager.set_verify_ssl(verify_ssl)
 
     def _load_cache(self):
         if self._cache_loaded:
@@ -1213,6 +1219,11 @@ def fuzzy_match_models(name):
         chat_models.add(fq_model)
         chat_models.add(orig_model)
 
+    # Add models from OpenAI-compatible endpoints if configured
+    openai_compatible_models = get_openai_compatible_models()
+    for model in openai_compatible_models:
+        chat_models.add(model)
+
     chat_models = sorted(chat_models)
     # exactly matching model
     # matching_models = [
@@ -1242,6 +1253,27 @@ def print_matching_models(io, search):
             io.tool_output(f"- {model}")
     else:
         io.tool_output(f'No models match "{search}".')
+
+
+def get_openai_compatible_models():
+    """
+    Get models from an OpenAI-compatible endpoint if OPENAI_API_BASE is set.
+    
+    Returns:
+        List of model names from the custom endpoint, or empty list if not configured.
+    """
+    import os
+    
+    api_base = os.environ.get("OPENAI_API_BASE")
+    if not api_base:
+        return []
+    
+    try:
+        models = model_info_manager.openai_compatible_manager.get_models(api_base)
+        return models
+    except Exception:
+        # Silently fail if we can't fetch models from the custom endpoint
+        return []
 
 
 def get_model_settings_as_yaml():

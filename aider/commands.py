@@ -203,8 +203,11 @@ class Commands:
         )
 
     def completions_model(self):
-        models = litellm.model_cost.keys()
-        return models
+        model_list = list(litellm.model_cost.keys())
+        # Add models from OpenAI-compatible endpoints if configured
+        openai_compatible_models = models.get_openai_compatible_models()
+        model_list.extend(openai_compatible_models)
+        return model_list
 
     def cmd_models(self, args):
         "Search the list of available models"
