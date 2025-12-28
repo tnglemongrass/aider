@@ -480,12 +480,14 @@ def main(argv=None, input=None, output=None, force_git_root=None, return_coder=F
     default_config_files.append(Path.home() / conf_fname)  # homedir
     
     # Add env-specified config file if provided
+    # OSError silently skipped - configargparse handles missing files gracefully
     if env_config_file:
         try:
             env_conf = Path(env_config_file).resolve()
             if env_conf not in default_config_files:
                 default_config_files.append(env_conf)
         except OSError:
+            # Invalid path specification, skip it
             pass
     
     default_config_files = list(map(str, default_config_files))
