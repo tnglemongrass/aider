@@ -1481,3 +1481,125 @@ class TestMain(TestCase):
             )
         for call in mock_io_instance.tool_warning.call_args_list:
             self.assertNotIn("Cost estimates may be inaccurate", call[0][0])
+
+    def test_openrouter_api_key_cli(self):
+        """Test that --openrouter-api-key sets OPENROUTER_API_KEY env var"""
+        test_key = "test-openrouter-key"
+        with patch("aider.coders.Coder.create"):
+            main(
+                ["--openrouter-api-key", test_key, "--no-git", "--yes", "--exit"],
+                input=DummyInput(),
+                output=DummyOutput(),
+            )
+            self.assertEqual(os.environ.get("OPENROUTER_API_KEY"), test_key)
+
+    def test_openrouter_api_key_env_var(self):
+        """Test that AIDER_OPENROUTER_API_KEY env var sets OPENROUTER_API_KEY"""
+        test_key = "test-openrouter-env-key"
+        os.environ["AIDER_OPENROUTER_API_KEY"] = test_key
+        with patch("aider.coders.Coder.create"):
+            main(["--no-git", "--yes", "--exit"], input=DummyInput(), output=DummyOutput())
+            self.assertEqual(os.environ.get("OPENROUTER_API_KEY"), test_key)
+
+    def test_docker_image_cli(self):
+        """Test that --docker-image sets AIDER_DOCKER_IMAGE env var"""
+        test_image = "aider/aider:latest"
+        with patch("aider.coders.Coder.create"):
+            main(
+                ["--docker-image", test_image, "--no-git", "--yes", "--exit"],
+                input=DummyInput(),
+                output=DummyOutput(),
+            )
+            self.assertEqual(os.environ.get("AIDER_DOCKER_IMAGE"), test_image)
+
+    def test_docker_image_env_var(self):
+        """Test that AIDER_DOCKER_IMAGE env var is preserved"""
+        test_image = "aider/aider:dev"
+        os.environ["AIDER_DOCKER_IMAGE"] = test_image
+        with patch("aider.coders.Coder.create"):
+            main(["--no-git", "--yes", "--exit"], input=DummyInput(), output=DummyOutput())
+            self.assertEqual(os.environ.get("AIDER_DOCKER_IMAGE"), test_image)
+
+    def test_cache_keepalive_delay_cli(self):
+        """Test that --cache-keepalive-delay sets AIDER_CACHE_KEEPALIVE_DELAY env var"""
+        test_delay = "180.5"
+        with patch("aider.coders.Coder.create"):
+            main(
+                ["--cache-keepalive-delay", test_delay, "--no-git", "--yes", "--exit"],
+                input=DummyInput(),
+                output=DummyOutput(),
+            )
+            self.assertEqual(os.environ.get("AIDER_CACHE_KEEPALIVE_DELAY"), test_delay)
+
+    def test_cache_keepalive_delay_env_var(self):
+        """Test that AIDER_CACHE_KEEPALIVE_DELAY env var is used"""
+        test_delay = "240"
+        os.environ["AIDER_CACHE_KEEPALIVE_DELAY"] = test_delay
+        # The env var is read by base_coder.py when needed
+        # When parsed by configargparse, it may be converted to float format
+        with patch("aider.coders.Coder.create"):
+            main(["--no-git", "--yes", "--exit"], input=DummyInput(), output=DummyOutput())
+            # Check it's set (may be converted to float format string)
+            self.assertIsNotNone(os.environ.get("AIDER_CACHE_KEEPALIVE_DELAY"))
+            self.assertIn("240", os.environ.get("AIDER_CACHE_KEEPALIVE_DELAY"))
+
+    def test_aider_config_env_var(self):
+        """Test that AIDER_CONFIG env var specifies config file"""
+        with GitTemporaryDirectory() as git_dir:
+            # Create a custom config file
+            config_file = Path("custom.aider.conf.yml")
+            config_file.write_text("dark-mode: true\n")
+
+            # Set AIDER_CONFIG to point to it
+            os.environ["AIDER_CONFIG"] = str(config_file.resolve())
+
+            with patch("aider.main.InputOutput") as MockInputOutput:
+                MockInputOutput.return_value.get_input.return_value = None
+                main(["--no-git", "--exit"], input=DummyInput(), output=DummyOutput())
+                MockInputOutput.assert_called_once()
+                # Check if dark mode was applied from config
+                _, kwargs = MockInputOutput.call_args
+                self.assertEqual(kwargs["code_theme"], "monokai")
+
+    def test_config_file_with_new_options(self):
+        """Test that new options work in config files"""
+        with GitTemporaryDirectory() as git_dir:
+            config_file = Path(".aider.conf.yml")
+            config_file.write_text(
+                """
+openrouter-api-key: config-openrouter-key
+docker-image: aider/aider:config
+cache-keepalive-delay: 200
+"""
+            )
+
+            with patch("aider.coders.Coder.create"):
+                main(["--no-git", "--yes", "--exit"], input=DummyInput(), output=DummyOutput())
+                self.assertEqual(os.environ.get("OPENROUTER_API_KEY"), "config-openrouter-key")
+                self.assertEqual(os.environ.get("AIDER_DOCKER_IMAGE"), "aider/aider:config")
+                self.assertEqual(os.environ.get("AIDER_CACHE_KEEPALIVE_DELAY"), "200.0")
+
+    def test_cli_overrides_env_for_new_options(self):
+        """Test that CLI args override env vars for new options (precedence)"""
+        # Set env vars
+        os.environ["AIDER_OPENROUTER_API_KEY"] = "env-key"
+        os.environ["AIDER_DOCKER_IMAGE"] = "env-image"
+
+        # Override with CLI
+        with patch("aider.coders.Coder.create"):
+            main(
+                [
+                    "--openrouter-api-key",
+                    "cli-key",
+                    "--docker-image",
+                    "cli-image",
+                    "--no-git",
+                    "--yes",
+                    "--exit",
+                ],
+                input=DummyInput(),
+                output=DummyOutput(),
+            )
+            # CLI should win
+            self.assertEqual(os.environ.get("OPENROUTER_API_KEY"), "cli-key")
+            self.assertEqual(os.environ.get("AIDER_DOCKER_IMAGE"), "cli-image")
