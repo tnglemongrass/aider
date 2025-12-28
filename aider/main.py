@@ -520,9 +520,11 @@ def main(argv=None, input=None, output=None, force_git_root=None, return_coder=F
         import httpx
 
         os.environ["SSL_VERIFY"] = ""
-        litellm._load_litellm()
-        litellm._lazy_module.client_session = httpx.Client(verify=False)
-        litellm._lazy_module.aclient_session = httpx.AsyncClient(verify=False)
+        # Only set client sessions if using LiteLLM
+        if os.environ.get("AIDER_USE_LITELLM", "").lower() == "true":
+            litellm._load_litellm()
+            litellm._lazy_module.client_session = httpx.Client(verify=False)
+            litellm._lazy_module.aclient_session = httpx.AsyncClient(verify=False)
         # Set verify_ssl on the model_info_manager
         models.model_info_manager.set_verify_ssl(False)
 
@@ -632,6 +634,18 @@ def main(argv=None, input=None, output=None, force_git_root=None, return_coder=F
             "--openai-organization-id is deprecated, use --set-env OPENAI_ORGANIZATION=<value>"
         )
         os.environ["OPENAI_ORGANIZATION"] = args.openai_organization_id
+
+    # Handle max_tokens setting
+    if args.max_tokens:
+        os.environ["MAX_TOKENS"] = str(args.max_tokens)
+    
+    # Handle use_litellm flag
+    if args.use_litellm:
+        os.environ["AIDER_USE_LITELLM"] = "true"
+    
+    # Set verify_ssl environment for SimpleLLM
+    if not args.verify_ssl:
+        os.environ["AIDER_VERIFY_SSL"] = "false"
 
     analytics = Analytics(
         logfile=args.analytics_log,
