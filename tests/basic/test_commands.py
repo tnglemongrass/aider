@@ -2224,3 +2224,111 @@ class TestCommands(TestCase):
             )
             self.assertEqual(new_coder.done_messages, [{"role": "user", "content": "d1"}])
             self.assertEqual(new_coder.cur_messages, [{"role": "user", "content": "c1"}])
+
+    def test_cmd_map_tokens_display(self):
+        """Test /map-tokens command displays current value"""
+        make_repo()
+        io = InputOutput(pretty=False, fancy_input=False, yes=True)
+        coder = Coder.create(self.GPT35, None, io, map_tokens=1024)
+        commands = Commands(io, coder)
+
+        with mock.patch.object(io, "tool_output") as mock_output:
+            commands.cmd_map_tokens("")
+            # Should display the current value
+            mock_output.assert_any_call("Current map token budget: 1,024 tokens.")
+
+    def test_cmd_map_tokens_set_value(self):
+        """Test /map-tokens command sets a new value"""
+        make_repo()
+        io = InputOutput(pretty=False, fancy_input=False, yes=True)
+        coder = Coder.create(self.GPT35, None, io, map_tokens=1024)
+        commands = Commands(io, coder)
+
+        with mock.patch.object(io, "tool_output") as mock_output:
+            commands.cmd_map_tokens("2048")
+            # Should set the new value
+            self.assertEqual(coder.repo_map.max_map_tokens, 2048)
+            mock_output.assert_any_call("Set map token budget to 2,048 tokens.")
+
+    def test_cmd_map_tokens_set_with_k_suffix(self):
+        """Test /map-tokens command with k suffix"""
+        make_repo()
+        io = InputOutput(pretty=False, fancy_input=False, yes=True)
+        coder = Coder.create(self.GPT35, None, io, map_tokens=1024)
+        commands = Commands(io, coder)
+
+        with mock.patch.object(io, "tool_output") as mock_output:
+            commands.cmd_map_tokens("4k")
+            # Should set to 4096
+            self.assertEqual(coder.repo_map.max_map_tokens, 4096)
+            mock_output.assert_any_call("Set map token budget to 4,096 tokens.")
+
+    def test_cmd_map_tokens_disable(self):
+        """Test /map-tokens command to disable repo map"""
+        make_repo()
+        io = InputOutput(pretty=False, fancy_input=False, yes=True)
+        coder = Coder.create(self.GPT35, None, io, map_tokens=1024)
+        commands = Commands(io, coder)
+
+        with mock.patch.object(io, "tool_output") as mock_output:
+            commands.cmd_map_tokens("0")
+            # Should disable the repo map
+            self.assertEqual(coder.repo_map.max_map_tokens, 0)
+            mock_output.assert_any_call("Repo map disabled (map-tokens set to 0).")
+
+    def test_cmd_map_tokens_invalid_value(self):
+        """Test /map-tokens command with invalid value"""
+        make_repo()
+        io = InputOutput(pretty=False, fancy_input=False, yes=True)
+        coder = Coder.create(self.GPT35, None, io, map_tokens=1024)
+        commands = Commands(io, coder)
+
+        with mock.patch.object(io, "tool_error") as mock_error:
+            commands.cmd_map_tokens("invalid")
+            # Should show error
+            mock_error.assert_called_once_with("Invalid map token value: invalid")
+
+    def test_cmd_map_tokens_no_repo_map(self):
+        """Test /map-tokens command when repo map is not available"""
+        io = InputOutput(pretty=False, fancy_input=False, yes=True)
+        coder = Coder.create(self.GPT35, None, io)
+        commands = Commands(io, coder)
+
+        with mock.patch.object(io, "tool_output") as mock_output:
+            commands.cmd_map_tokens("")
+            # Should indicate repo map is not available
+            mock_output.assert_called_once_with("Repo map is not available.")
+
+    def test_cmd_map_tokens_restore_default(self):
+        """Test /map-tokens command with -1 to restore default"""
+        make_repo()
+        io = InputOutput(pretty=False, fancy_input=False, yes=True)
+        coder = Coder.create(self.GPT35, None, io, map_tokens=2048)
+        commands = Commands(io, coder)
+
+        # Get the default for this model
+        default_tokens = int(self.GPT35.get_repo_map_tokens())
+
+        with mock.patch.object(io, "tool_output") as mock_output:
+            commands.cmd_map_tokens("-1")
+            # Should restore to default
+            self.assertEqual(coder.repo_map.max_map_tokens, default_tokens)
+            mock_output.assert_any_call(f"Restored default map token budget to {default_tokens:,} tokens.")
+
+    def test_cmd_map_tokens_reenable_after_disable(self):
+        """Test /map-tokens can re-enable after disabling"""
+        make_repo()
+        io = InputOutput(pretty=False, fancy_input=False, yes=True)
+        coder = Coder.create(self.GPT35, None, io, map_tokens=1024)
+        commands = Commands(io, coder)
+
+        # Disable
+        commands.cmd_map_tokens("0")
+        self.assertEqual(coder.repo_map.max_map_tokens, 0)
+
+        # Re-enable with 4k
+        with mock.patch.object(io, "tool_output") as mock_output:
+            commands.cmd_map_tokens("4k")
+            # Should set to 4096
+            self.assertEqual(coder.repo_map.max_map_tokens, 4096)
+            mock_output.assert_any_call("Set map token budget to 4,096 tokens.")
