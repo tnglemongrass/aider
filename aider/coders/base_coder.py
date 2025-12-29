@@ -23,7 +23,6 @@ from aider.commands import Commands
 from aider.exceptions import LiteLLMExceptions
 from aider.history import ChatSummary
 from aider.io import ConfirmGroup, InputOutput
-from aider.linter import Linter
 from aider.llm import litellm
 from aider.models import RETRY_TIMEOUT
 from aider.reasoning_tags import (
@@ -34,14 +33,16 @@ from aider.reasoning_tags import (
 )
 from aider.repo import ANY_GIT_ERROR, GitRepo
 from aider.repomap import RepoMap
-from aider.run_cmd import run_cmd
 from aider.utils import format_content, format_messages, format_tokens, is_image_file
 from aider.waiting import WaitingSpinner
 
 from ..dump import dump  # noqa: F401
 from .chat_chunks import ChatChunks
+from .commit_manager import CommitManager
 from .file_manager import FileManager
+from .lint_test_manager import LintTestManager
 from .platform_detector import PlatformDetector
+from .shell_command_manager import ShellCommandManager
 from .token_calculator import TokenCalculator
 
 
@@ -337,7 +338,6 @@ class Coder:
         self.chat_language = chat_language
         self.commit_language = commit_language
         self.commit_before_message = []
-        self.aider_commit_hashes = set()
         self.rejected_urls = set()
 
         self.auto_copy_context = auto_copy_context
@@ -362,14 +362,11 @@ class Coder:
         if io is None:
             io = InputOutput()
 
-        if aider_commit_hashes:
-            self.aider_commit_hashes = aider_commit_hashes
-        else:
-            self.aider_commit_hashes = set()
+        # Note: aider_commit_hashes will be set via commit_manager later
 
         self.chat_completion_call_hashes = []
         self.chat_completion_response_hashes = []
-        self.need_commit_before_edits = set()
+        # Note: need_commit_before_edits is now a property of commit_manager
 
         self.verbose = verbose
         self.abs_fnames = set()
@@ -390,8 +387,7 @@ class Coder:
 
         # Initialize helper classes
         self.platform_detector = PlatformDetector()
-
-        self.shell_commands = []
+        self.shell_command_manager = ShellCommandManager(io, None)  # root set later
 
         if not auto_commits:
             dirty_commits = False
@@ -471,6 +467,9 @@ class Coder:
         # Initialize file manager after root is determined
         self.file_manager = FileManager(self.root, io, self.abs_fnames, self.abs_read_only_fnames)
 
+        # Update shell command manager with root
+        self.shell_command_manager.root = self.root
+
         if read_only_fnames:
             self.abs_read_only_fnames = set()
             for fname in read_only_fnames:
@@ -519,12 +518,17 @@ class Coder:
                 self.summarize_start()
 
         # Linting and testing
-        self.linter = Linter(root=self.root, encoding=io.encoding)
+        self.lint_test_manager = LintTestManager(io, self.root, io.encoding)
         self.auto_lint = auto_lint
-        self.setup_lint_cmds(lint_cmds)
+        self.lint_test_manager.setup_lint_cmds(lint_cmds)
         self.lint_cmds = lint_cmds
         self.auto_test = auto_test
         self.test_cmd = test_cmd
+
+        # Commit management
+        self.commit_manager = CommitManager(self.repo, io, self.gpt_prompts, self.commands)
+        if aider_commit_hashes:
+            self.commit_manager.aider_commit_hashes = aider_commit_hashes
 
         # validate the functions jsonschema
         if self.functions:
@@ -538,10 +542,8 @@ class Coder:
                 self.io.tool_output(json.dumps(self.functions, indent=4))
 
     def setup_lint_cmds(self, lint_cmds):
-        if not lint_cmds:
-            return
-        for lang, cmd in lint_cmds.items():
-            self.linter.set_linter(lang, cmd)
+        if hasattr(self, 'lint_test_manager'):
+            self.lint_test_manager.setup_lint_cmds(lint_cmds)
 
     # Properties for backward compatibility with token calculator
     @property
@@ -620,6 +622,50 @@ class Coder:
     def usage_report(self, value):
         if hasattr(self, 'token_calculator'):
             self.token_calculator.usage_report = value
+
+    @property
+    def shell_commands(self):
+        if hasattr(self, 'shell_command_manager'):
+            return self.shell_command_manager.shell_commands
+        return []
+
+    @shell_commands.setter
+    def shell_commands(self, value):
+        if hasattr(self, 'shell_command_manager'):
+            self.shell_command_manager.shell_commands = value
+
+    @property
+    def need_commit_before_edits(self):
+        if hasattr(self, 'commit_manager'):
+            return self.commit_manager.need_commit_before_edits
+        return set()
+
+    @need_commit_before_edits.setter
+    def need_commit_before_edits(self, value):
+        if hasattr(self, 'commit_manager'):
+            self.commit_manager.need_commit_before_edits = value
+
+    @property
+    def last_aider_commit_hash(self):
+        if hasattr(self, 'commit_manager'):
+            return self.commit_manager.last_aider_commit_hash
+        return None
+
+    @last_aider_commit_hash.setter
+    def last_aider_commit_hash(self, value):
+        if hasattr(self, 'commit_manager'):
+            self.commit_manager.last_aider_commit_hash = value
+
+    @property
+    def aider_commit_hashes(self):
+        if hasattr(self, 'commit_manager'):
+            return self.commit_manager.aider_commit_hashes
+        return set()
+
+    @aider_commit_hashes.setter
+    def aider_commit_hashes(self, value):
+        if hasattr(self, 'commit_manager'):
+            self.commit_manager.aider_commit_hashes = value
 
     def show_announcements(self):
         bold = True
@@ -1600,21 +1646,7 @@ class Coder:
         self.io.offer_url(urls.token_limits)
 
     def lint_edited(self, fnames):
-        res = ""
-        for fname in fnames:
-            if not fname:
-                continue
-            errors = self.linter.lint(self.abs_root_path(fname))
-
-            if errors:
-                res += "\n"
-                res += errors
-                res += "\n"
-
-        if res:
-            self.io.tool_warning(res)
-
-        return res
+        return self.lint_test_manager.lint_edited(fnames, self.abs_root_path)
 
     def __del__(self):
         """Cleanup when the Coder object is destroyed."""
@@ -1979,20 +2011,7 @@ class Coder:
         return all_files - inchat_files - read_only_files
 
     def check_for_dirty_commit(self, path):
-        if not self.repo:
-            return
-        if not self.dirty_commits:
-            return
-        if not self.repo.is_dirty(path):
-            return
-
-        # We need a committed copy of the file in order to /undo, so skip this
-        # fullp = Path(self.abs_root_path(path))
-        # if not fullp.stat().st_size:
-        #     return
-
-        self.io.tool_output(f"Committing {path} before applying edits.")
-        self.need_commit_before_edits.add(path)
+        self.commit_manager.check_for_dirty_commit(path, self.dirty_commits)
 
     def allowed_to_edit(self, path):
         full_path = self.abs_root_path(path)
@@ -2171,62 +2190,31 @@ class Coder:
     # commits...
 
     def get_context_from_history(self, history):
-        context = ""
-        if history:
-            for msg in history:
-                context += "\n" + msg["role"].upper() + ": " + msg["content"] + "\n"
-
-        return context
+        return self.commit_manager.get_context_from_history(history)
 
     def auto_commit(self, edited, context=None):
-        if not self.repo or not self.auto_commits or self.dry_run:
-            return
-
-        if not context:
-            context = self.get_context_from_history(self.cur_messages)
-
-        try:
-            res = self.repo.commit(fnames=edited, context=context, aider_edits=True, coder=self)
-            if res:
-                self.show_auto_commit_outcome(res)
-                commit_hash, commit_message = res
-                return self.gpt_prompts.files_content_gpt_edits.format(
-                    hash=commit_hash,
-                    message=commit_message,
-                )
-
-            return self.gpt_prompts.files_content_gpt_no_edits
-        except ANY_GIT_ERROR as err:
-            self.io.tool_error(f"Unable to commit: {str(err)}")
-            return
+        result = self.commit_manager.auto_commit(
+            edited, context, self.cur_messages,
+            self.auto_commits, self.dry_run, self.show_diffs
+        )
+        # Sync state back to coder
+        self.last_aider_commit_hash = self.commit_manager.last_aider_commit_hash
+        self.aider_commit_hashes = self.commit_manager.aider_commit_hashes
+        return result
 
     def show_auto_commit_outcome(self, res):
-        commit_hash, commit_message = res
-        self.last_aider_commit_hash = commit_hash
-        self.aider_commit_hashes.add(commit_hash)
-        self.last_aider_commit_message = commit_message
-        if self.show_diffs:
-            self.commands.cmd_diff()
+        self.commit_manager.show_auto_commit_outcome(res, self.show_diffs)
+        # Sync state back to coder
+        self.last_aider_commit_hash = self.commit_manager.last_aider_commit_hash
+        self.aider_commit_hashes = self.commit_manager.aider_commit_hashes
 
     def show_undo_hint(self):
-        if not self.commit_before_message:
-            return
-        if self.commit_before_message[-1] != self.repo.get_head_commit_sha():
-            self.io.tool_output("You can use /undo to undo and discard each aider commit.")
+        self.commit_manager.show_undo_hint(self.commit_before_message)
 
     def dirty_commit(self):
-        if not self.need_commit_before_edits:
-            return
-        if not self.dirty_commits:
-            return
-        if not self.repo:
-            return
-
-        self.repo.commit(fnames=self.need_commit_before_edits, coder=self)
-
-        # files changed, move cur messages back behind the files messages
-        # self.move_back_cur_messages(self.gpt_prompts.files_content_local_edits)
-        return True
+        result = self.commit_manager.dirty_commit(self.dirty_commits)
+        self.need_commit_before_edits = self.commit_manager.need_commit_before_edits
+        return result
 
     def get_edits(self, mode="update"):
         return []
@@ -2238,54 +2226,7 @@ class Coder:
         return edits
 
     def run_shell_commands(self):
-        if not self.suggest_shell_commands:
-            return ""
-
-        done = set()
-        group = ConfirmGroup(set(self.shell_commands))
-        accumulated_output = ""
-        for command in self.shell_commands:
-            if command in done:
-                continue
-            done.add(command)
-            output = self.handle_shell_commands(command, group)
-            if output:
-                accumulated_output += output + "\n\n"
-        return accumulated_output
+        return self.shell_command_manager.run_shell_commands(self.suggest_shell_commands)
 
     def handle_shell_commands(self, commands_str, group):
-        commands = commands_str.strip().splitlines()
-        command_count = sum(
-            1 for cmd in commands if cmd.strip() and not cmd.strip().startswith("#")
-        )
-        prompt = "Run shell command?" if command_count == 1 else "Run shell commands?"
-        if not self.io.confirm_ask(
-            prompt,
-            subject="\n".join(commands),
-            explicit_yes_required=True,
-            group=group,
-            allow_never=True,
-        ):
-            return
-
-        accumulated_output = ""
-        for command in commands:
-            command = command.strip()
-            if not command or command.startswith("#"):
-                continue
-
-            self.io.tool_output()
-            self.io.tool_output(f"Running {command}")
-            # Add the command to input history
-            self.io.add_to_input_history(f"/run {command.strip()}")
-            exit_status, output = run_cmd(command, error_print=self.io.tool_error, cwd=self.root)
-            if output:
-                accumulated_output += f"Output from {command}\n{output}\n"
-
-        if accumulated_output.strip() and self.io.confirm_ask(
-            "Add command output to the chat?", allow_never=True
-        ):
-            num_lines = len(accumulated_output.strip().splitlines())
-            line_plural = "line" if num_lines == 1 else "lines"
-            self.io.tool_output(f"Added {num_lines} {line_plural} of output to the chat.")
-            return accumulated_output
+        return self.shell_command_manager.handle_shell_commands(commands_str, group)
