@@ -30,12 +30,22 @@ For OpenAI-compatible API servers, you can use a minimal configuration with just
 # .env file for OpenAI-compatible API
 OPENAI_API_BASE=https://api.example.com/v1
 OPENAI_API_KEY=your-api-key-here
-MODEL=openai/your-model-name
+OPENAI_MODEL=your-model-name
 ```
 
-This is simpler than using the `AIDER_` prefixed variables and doesn't require command-line arguments or complex configuration files. Just set these three variables and run `aider` in your project directory.
+Optionally, you can override the context window size:
 
-**Note:** If both `AIDER_MODEL` and `MODEL` are set, `AIDER_MODEL` takes precedence. The `--model` command-line argument takes highest precedence over both.
+```bash
+MAX_TOKENS=8192
+```
+
+This is simpler than using the `AIDER_` prefixed variables and doesn't require command-line arguments or complex configuration files. Just set these variables and run `aider` in your project directory.
+
+**Note:** 
+- The `openai/` prefix is automatically added to `OPENAI_MODEL`, so use just the model name (e.g., `gpt-4o` not `openai/gpt-4o`)
+- If both `AIDER_MODEL` and `OPENAI_MODEL` are set, `AIDER_MODEL` takes precedence
+- The `--model` command-line argument takes highest precedence over both
+- `OPENAI_MODEL` is specifically designed for OpenAI-compatible endpoints and auto-adds the `openai/` prefix
 
 ## Sample .env file
 

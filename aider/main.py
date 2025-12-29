@@ -782,6 +782,23 @@ def main(argv=None, input=None, output=None, force_git_root=None, return_coder=F
         return 1
     args.model = selected_model_name  # Update args with the selected model
 
+    # Handle MAX_TOKENS environment variable for OpenAI-compatible APIs
+    max_tokens_env = os.environ.get("MAX_TOKENS", "").strip()
+    if max_tokens_env and args.model.startswith("openai/"):
+        try:
+            max_tokens_value = int(max_tokens_env)
+            # Inject into local model metadata for this session
+            model_metadata = {
+                "max_tokens": max_tokens_value,
+                "max_input_tokens": max_tokens_value,
+                "max_output_tokens": max_tokens_value,
+            }
+            models.model_info_manager.local_model_metadata[args.model] = model_metadata
+            if args.verbose:
+                io.tool_output(f"Using MAX_TOKENS={max_tokens_value} from environment variable")
+        except ValueError:
+            io.tool_warning(f"Invalid MAX_TOKENS value '{max_tokens_env}', must be an integer")
+
     # Check if an OpenRouter model was selected/specified but the key is missing
     if args.model.startswith("openrouter/") and not os.environ.get("OPENROUTER_API_KEY"):
         io.tool_warning(

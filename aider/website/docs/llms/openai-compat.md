@@ -19,14 +19,34 @@ For the simplest setup, configure your API connection using only environment var
 # Mac/Linux:
 export OPENAI_API_BASE=<endpoint>
 export OPENAI_API_KEY=<key>
-export MODEL=openai/<model-name>
+export OPENAI_MODEL=<model-name>
 
-# Windows:
+# Windows (PowerShell):
+$env:OPENAI_API_BASE="<endpoint>"
+$env:OPENAI_API_KEY="<key>"
+$env:OPENAI_MODEL="<model-name>"
+
+# Windows (cmd - persistent):
 setx OPENAI_API_BASE <endpoint>
 setx OPENAI_API_KEY <key>
-setx MODEL openai/<model-name>
+setx OPENAI_MODEL <model-name>
 # ... restart shell after setx commands
 ```
+
+Optional: Set `MAX_TOKENS` to override the context window size:
+
+```bash
+# Mac/Linux:
+export MAX_TOKENS=8192
+
+# Windows (PowerShell):
+$env:MAX_TOKENS="8192"
+
+# Windows (cmd):
+setx MAX_TOKENS 8192
+```
+
+**Note:** The `openai/` prefix is automatically added to the model name, so you can use just the model name (e.g., `gpt-4o` instead of `openai/gpt-4o`).
 
 Then start aider in your codebase without any additional arguments:
 
@@ -44,7 +64,11 @@ Alternatively, you can set the API endpoint via environment variables and specif
 export OPENAI_API_BASE=<endpoint>
 export OPENAI_API_KEY=<key>
 
-# Windows:
+# Windows (PowerShell):
+$env:OPENAI_API_BASE="<endpoint>"
+$env:OPENAI_API_KEY="<key>"
+
+# Windows (cmd):
 setx OPENAI_API_BASE <endpoint>
 setx OPENAI_API_KEY <key>
 # ... restart shell after setx commands
