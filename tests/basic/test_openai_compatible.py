@@ -1,5 +1,8 @@
 from pathlib import Path
 
+import requests
+
+from aider import models
 from aider.models import get_openai_compatible_models
 from aider.openai_compatible import OpenAICompatibleModelManager
 
@@ -102,7 +105,6 @@ def test_openai_compatible_handles_api_failure(monkeypatch, tmp_path):
     """
     OpenAICompatibleModelManager should gracefully handle API failures.
     """
-    import requests
 
     def mock_get(*args, **kwargs):
         raise requests.RequestException("Network error")
@@ -164,7 +166,6 @@ def test_get_openai_compatible_models_with_env(monkeypatch, tmp_path):
     monkeypatch.setenv("OPENAI_API_BASE", "https://api.example.com/v1")
 
     # Need to reinitialize the model_info_manager to pick up the new environment
-    from aider import models
     models.model_info_manager.openai_compatible_manager = OpenAICompatibleModelManager()
 
     fetched_models = get_openai_compatible_models()
