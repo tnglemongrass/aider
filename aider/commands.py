@@ -1427,7 +1427,7 @@ class Commands:
             return
 
         value = args.strip()
-        
+
         # Parse the value (support formats like "2048", "4k", "1.5k")
         try:
             if value.lower().endswith('k'):
@@ -1450,15 +1450,15 @@ class Commands:
             return
 
         # Update the repo_map if it exists
-        if self.coder.repo_map:
-            self.coder.repo_map.max_map_tokens = map_tokens
-            if map_tokens == 0:
-                self.io.tool_output("Repo map disabled (map-tokens set to 0).")
-            else:
-                self.io.tool_output(f"Set map token budget to {map_tokens:,} tokens.")
-        else:
+        if not self.coder.repo_map:
             self.io.tool_output("Repo map is not available.")
             return
+
+        self.coder.repo_map.max_map_tokens = map_tokens
+        if map_tokens == 0:
+            self.io.tool_output("Repo map disabled (map-tokens set to 0).")
+        else:
+            self.io.tool_output(f"Set map token budget to {map_tokens:,} tokens.")
 
         self.io.tool_output()
 
