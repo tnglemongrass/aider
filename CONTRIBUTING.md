@@ -122,6 +122,37 @@ python3 -m venv ../aider_venv \
 
 Just run `pytest`.
 
+### Code Quality Standards
+
+#### Type Hints
+
+The project is adopting gradual typing to improve code quality and developer experience. 
+
+**Benefits of Type Hints:**
+- Catch bugs earlier with static type checking
+- Better IDE support (autocomplete, refactoring, navigation)
+- Serve as living documentation that stays up-to-date
+- Make it easier for new contributors to understand the codebase
+
+**Type Hints Policy:**
+- All **new code** should include comprehensive type hints
+- Use type hints for function parameters and return values
+- Use type hints for class attributes
+- See `aider/typing_example.py` for examples and best practices
+
+**Running Type Checks:**
+```bash
+# Check specific files
+mypy aider/your_module.py
+
+# Check the entire aider package (will show errors for untyped code)
+mypy aider/
+```
+
+The mypy type checker is configured in `pyproject.toml` with gradual typing enabled. This allows the codebase to be typed incrementally without breaking existing untyped code.
+
+**Note:** Type hints are automatically checked when you use pre-commit hooks (see below).
+
 ### Building the Docker Image
 
 The project includes a `Dockerfile` for building a Docker image. You can build the image by running:
