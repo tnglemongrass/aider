@@ -782,8 +782,8 @@ def main(argv=None, input=None, output=None, force_git_root=None, return_coder=F
         return 1
     args.model = selected_model_name  # Update args with the selected model
 
-    # Handle MAX_TOKENS environment variable for OpenAI-compatible APIs
-    # MAX_TOKENS applies to any model with openai/ prefix or custom models
+    # Handle MAX_TOKENS environment variable
+    # MAX_TOKENS can be used with any model to override the context window size
     max_tokens_env = os.environ.get("MAX_TOKENS", "").strip()
     if max_tokens_env:
         try:
