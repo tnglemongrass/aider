@@ -782,6 +782,28 @@ def main(argv=None, input=None, output=None, force_git_root=None, return_coder=F
         return 1
     args.model = selected_model_name  # Update args with the selected model
 
+    # Handle MAX_TOKENS environment variable
+    # MAX_TOKENS can be used with any model to override the context window size
+    max_tokens_env = os.environ.get("MAX_TOKENS", "").strip()
+    if max_tokens_env:
+        try:
+            max_tokens_value = int(max_tokens_env)
+            # For OpenAI-compatible APIs, MAX_TOKENS typically represents the context window
+            # We set both input and output to this value as a reasonable default
+            # Individual models can override via model metadata files if needed
+            model_metadata = {
+                "max_tokens": max_tokens_value,
+                "max_input_tokens": max_tokens_value,
+                "max_output_tokens": max_tokens_value,
+            }
+            models.model_info_manager.local_model_metadata[args.model] = model_metadata
+            if args.verbose:
+                io.tool_output(
+                    f"Using MAX_TOKENS={max_tokens_value} from environment variable for {args.model}"
+                )
+        except ValueError:
+            io.tool_warning(f"Invalid MAX_TOKENS value '{max_tokens_env}', must be an integer")
+
     # Check if an OpenRouter model was selected/specified but the key is missing
     if args.model.startswith("openrouter/") and not os.environ.get("OPENROUTER_API_KEY"):
         io.tool_warning(

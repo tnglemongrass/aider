@@ -127,7 +127,18 @@ def select_default_model(args, io, analytics):
         The name of the selected model, or None if no suitable default is found.
     """
     if args.model:
-        return args.model  # Model already specified
+        return args.model  # Model already specified (includes AIDER_MODEL from env)
+
+    # Check for OPENAI_MODEL environment variable (simpler alternative without AIDER_ prefix)
+    # This is checked AFTER args.model so that AIDER_MODEL (processed by configargparse) takes precedence
+    openai_model_from_env = os.environ.get("OPENAI_MODEL", "").strip()
+    if openai_model_from_env:
+        # Auto-add openai/ prefix if not already present
+        if not openai_model_from_env.startswith("openai/"):
+            openai_model_from_env = f"openai/{openai_model_from_env}"
+        io.tool_warning(f"Using {openai_model_from_env} model from OPENAI_MODEL environment variable.")
+        analytics.event("model_from_env", model=openai_model_from_env)
+        return openai_model_from_env
 
     model = try_to_select_default_model()
     if model:
