@@ -783,11 +783,14 @@ def main(argv=None, input=None, output=None, force_git_root=None, return_coder=F
     args.model = selected_model_name  # Update args with the selected model
 
     # Handle MAX_TOKENS environment variable for OpenAI-compatible APIs
+    # MAX_TOKENS applies to any model with openai/ prefix or custom models
     max_tokens_env = os.environ.get("MAX_TOKENS", "").strip()
-    if max_tokens_env and args.model.startswith("openai/"):
+    if max_tokens_env:
         try:
             max_tokens_value = int(max_tokens_env)
-            # Inject into local model metadata for this session
+            # For OpenAI-compatible APIs, MAX_TOKENS typically represents the context window
+            # We set both input and output to this value as a reasonable default
+            # Individual models can override via model metadata files if needed
             model_metadata = {
                 "max_tokens": max_tokens_value,
                 "max_input_tokens": max_tokens_value,
@@ -795,7 +798,9 @@ def main(argv=None, input=None, output=None, force_git_root=None, return_coder=F
             }
             models.model_info_manager.local_model_metadata[args.model] = model_metadata
             if args.verbose:
-                io.tool_output(f"Using MAX_TOKENS={max_tokens_value} from environment variable")
+                io.tool_output(
+                    f"Using MAX_TOKENS={max_tokens_value} from environment variable for {args.model}"
+                )
         except ValueError:
             io.tool_warning(f"Invalid MAX_TOKENS value '{max_tokens_env}', must be an integer")
 

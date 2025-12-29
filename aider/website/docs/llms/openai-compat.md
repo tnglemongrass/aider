@@ -46,7 +46,10 @@ $env:MAX_TOKENS="8192"
 setx MAX_TOKENS 8192
 ```
 
-**Note:** The `openai/` prefix is automatically added to the model name, so you can use just the model name (e.g., `gpt-4o` instead of `openai/gpt-4o`).
+**Note:** 
+- MAX_TOKENS sets the context window size (both input and output token limits)
+- This is useful when the model's default limits are incorrect or need adjustment
+- The `openai/` prefix is automatically added to `OPENAI_MODEL`, so use just the model name (e.g., `gpt-4o` instead of `openai/gpt-4o`)
 
 Then start aider in your codebase without any additional arguments:
 
