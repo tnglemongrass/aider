@@ -18,7 +18,7 @@ class PlatformDetector:
 
     def __init__(self, chat_language=None):
         """Initialize PlatformDetector.
-        
+
         Args:
             chat_language: Optional explicit language override
         """
@@ -26,10 +26,10 @@ class PlatformDetector:
 
     def normalize_language(self, lang_code):
         """Convert a locale code to a readable language name.
-        
+
         Args:
             lang_code: Locale code like 'en_US' or 'fr'
-            
+
         Returns:
             Human-readable language name like 'English' or 'French', or None
         """
@@ -74,12 +74,12 @@ class PlatformDetector:
 
     def get_user_language(self):
         """Detect the user's language preference.
-        
+
         Detection order:
         1. self.chat_language if explicitly set
         2. locale.getlocale()
         3. LANG / LANGUAGE / LC_ALL / LC_MESSAGES environment variables
-        
+
         Returns:
             Human-readable language name like 'English', or None
         """
@@ -106,16 +106,19 @@ class PlatformDetector:
 
         return None
 
-    def get_platform_info(self, repo=None, lint_cmds=None, auto_lint=True, test_cmd=None, auto_test=False):
+    def get_platform_info(
+        self, repo=None, lint_cmds=None, auto_lint=True,
+        test_cmd=None, auto_test=False
+    ):
         """Get platform information text.
-        
+
         Args:
             repo: GitRepo instance or None
             lint_cmds: Dict of lint commands
             auto_lint: Whether auto-linting is enabled
             test_cmd: Test command string
             auto_test: Whether auto-testing is enabled
-            
+
         Returns:
             Formatted platform information text
         """

@@ -35,7 +35,7 @@ from aider.reasoning_tags import (
 from aider.repo import ANY_GIT_ERROR, GitRepo
 from aider.repomap import RepoMap
 from aider.run_cmd import run_cmd
-from aider.utils import format_content, format_messages, is_image_file
+from aider.utils import format_content, format_messages, format_tokens, is_image_file
 from aider.waiting import WaitingSpinner
 
 from ..dump import dump  # noqa: F401
@@ -102,7 +102,6 @@ class Coder:
     multi_response_content = ""
     partial_response_content = ""
     commit_before_message = []
-    message_cost = 0.0
     add_cache_headers = False
     cache_warming_thread = None
     num_cache_warming_pings = 0
@@ -388,10 +387,10 @@ class Coder:
             self.done_messages = []
 
         self.io = io
-        
+
         # Initialize helper classes
         self.platform_detector = PlatformDetector(chat_language)
-        
+
         self.shell_commands = []
 
         if not auto_commits:
@@ -408,7 +407,7 @@ class Coder:
         self.reasoning_tag_name = (
             self.main_model.reasoning_tag if self.main_model.reasoning_tag else REASONING_TAG
         )
-        
+
         # Initialize token calculator
         self.token_calculator = TokenCalculator(main_model, io)
         self.token_calculator.total_cost = total_cost
@@ -468,7 +467,7 @@ class Coder:
 
         if not self.repo:
             self.root = utils.find_common_root(self.abs_fnames)
-        
+
         # Initialize file manager after root is determined
         self.file_manager = FileManager(self.root, io, self.abs_fnames, self.abs_read_only_fnames)
 
@@ -543,60 +542,60 @@ class Coder:
             return
         for lang, cmd in lint_cmds.items():
             self.linter.set_linter(lang, cmd)
-    
+
     # Properties for backward compatibility with token calculator
     @property
     def total_cost(self):
         return self.token_calculator.total_cost
-    
+
     @total_cost.setter
     def total_cost(self, value):
         self.token_calculator.total_cost = value
-    
+
     @property
     def total_tokens_sent(self):
         return self.token_calculator.total_tokens_sent
-    
+
     @total_tokens_sent.setter
     def total_tokens_sent(self, value):
         self.token_calculator.total_tokens_sent = value
-    
+
     @property
     def total_tokens_received(self):
         return self.token_calculator.total_tokens_received
-    
+
     @total_tokens_received.setter
     def total_tokens_received(self, value):
         self.token_calculator.total_tokens_received = value
-    
+
     @property
     def message_cost(self):
         return self.token_calculator.message_cost
-    
+
     @message_cost.setter
     def message_cost(self, value):
         self.token_calculator.message_cost = value
-    
+
     @property
     def message_tokens_sent(self):
         return self.token_calculator.message_tokens_sent
-    
+
     @message_tokens_sent.setter
     def message_tokens_sent(self, value):
         self.token_calculator.message_tokens_sent = value
-    
+
     @property
     def message_tokens_received(self):
         return self.token_calculator.message_tokens_received
-    
+
     @message_tokens_received.setter
     def message_tokens_received(self, value):
         self.token_calculator.message_tokens_received = value
-    
+
     @property
     def usage_report(self):
         return self.token_calculator.usage_report
-    
+
     @usage_report.setter
     def usage_report(self, value):
         self.token_calculator.usage_report = value
@@ -1885,7 +1884,9 @@ class Coder:
         )
 
     def show_usage_report(self):
-        self.token_calculator.show_usage_report(event_callback=self.event, edit_format=self.edit_format)
+        self.token_calculator.show_usage_report(
+            event_callback=self.event, edit_format=self.edit_format
+        )
         # Update local references for backwards compatibility
         self.total_cost = self.token_calculator.total_cost
         self.total_tokens_sent = self.token_calculator.total_tokens_sent

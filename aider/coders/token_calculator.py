@@ -11,7 +11,7 @@ class TokenCalculator:
 
     def __init__(self, main_model, io):
         """Initialize TokenCalculator.
-        
+
         Args:
             main_model: The main model instance
             io: InputOutput instance for displaying messages
@@ -28,7 +28,7 @@ class TokenCalculator:
 
     def calculate_and_show_tokens_and_cost(self, messages, completion=None):
         """Calculate tokens and costs from a completion response.
-        
+
         Args:
             messages: List of messages sent to the LLM
             completion: Completion response object from the LLM
@@ -112,13 +112,13 @@ class TokenCalculator:
         self, prompt_tokens, completion_tokens, cache_write_tokens, cache_hit_tokens
     ):
         """Compute costs from token counts.
-        
+
         Args:
             prompt_tokens: Number of prompt tokens
             completion_tokens: Number of completion tokens
             cache_write_tokens: Number of cache write tokens
             cache_hit_tokens: Number of cache hit tokens
-            
+
         Returns:
             Total cost as a float
         """
@@ -153,7 +153,7 @@ class TokenCalculator:
 
     def show_usage_report(self, event_callback=None, edit_format=None):
         """Show usage report and emit analytics event.
-        
+
         Args:
             event_callback: Optional callback for analytics events
             edit_format: Edit format string for analytics
@@ -186,10 +186,10 @@ class TokenCalculator:
 
     def check_tokens(self, messages):
         """Check if the messages will fit within the model's token limits.
-        
+
         Args:
             messages: List of messages to check
-            
+
         Returns:
             True if safe to proceed, False otherwise
         """

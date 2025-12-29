@@ -11,7 +11,7 @@ class FileManager:
 
     def __init__(self, root, io, abs_fnames=None, abs_read_only_fnames=None):
         """Initialize FileManager.
-        
+
         Args:
             root: Root directory path
             io: InputOutput instance for reading files
@@ -20,8 +20,12 @@ class FileManager:
         """
         self.root = root
         self.io = io
-        self.abs_fnames = abs_fnames if abs_fnames is not None else set()
-        self.abs_read_only_fnames = abs_read_only_fnames if abs_read_only_fnames is not None else set()
+        self.abs_fnames = (
+            abs_fnames if abs_fnames is not None else set()
+        )
+        self.abs_read_only_fnames = (
+            abs_read_only_fnames if abs_read_only_fnames is not None else set()
+        )
         self.abs_root_path_cache = {}
 
     def abs_root_path(self, path):
