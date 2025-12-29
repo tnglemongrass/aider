@@ -1227,7 +1227,7 @@ This command will print 'Hello, World!' to the console."""
         self.assertEqual(coder.normalize_language("French"), "French")
 
         # Test common locale codes (fallback map, assuming babel is not installed or fails)
-        with patch("aider.coders.base_coder.Locale", None):
+        with patch("aider.coders.platform_detector.Locale", None):
             self.assertEqual(coder.normalize_language("en_US"), "English")
             self.assertEqual(coder.normalize_language("fr_FR"), "French")
             self.assertEqual(coder.normalize_language("es"), "Spanish")
@@ -1245,7 +1245,7 @@ This command will print 'Hello, World!' to the console."""
         mock_locale_instance = MagicMock()
         mock_babel_locale.parse.return_value = mock_locale_instance
 
-        with patch("aider.coders.base_coder.Locale", mock_babel_locale):
+        with patch("aider.coders.platform_detector.Locale", mock_babel_locale):
             mock_locale_instance.get_display_name.return_value = "english"  # For en_US
             self.assertEqual(coder.normalize_language("en_US"), "English")
             mock_babel_locale.parse.assert_called_with("en_US")
@@ -1259,7 +1259,7 @@ This command will print 'Hello, World!' to the console."""
         # Test with babel.Locale raising an exception (simulating parse failure)
         mock_babel_locale_error = MagicMock()
         mock_babel_locale_error.parse.side_effect = Exception("Babel parse error")
-        with patch("aider.coders.base_coder.Locale", mock_babel_locale_error):
+        with patch("aider.coders.platform_detector.Locale", mock_babel_locale_error):
             self.assertEqual(coder.normalize_language("en_US"), "English")  # Falls back to map
 
     def test_get_user_language(self):

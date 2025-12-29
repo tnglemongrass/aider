@@ -16,13 +16,9 @@ except ImportError:  # Babel not installed – we will fall back to a small mapp
 class PlatformDetector:
     """Detects platform and language information for the user."""
 
-    def __init__(self, chat_language=None):
-        """Initialize PlatformDetector.
-
-        Args:
-            chat_language: Optional explicit language override
-        """
-        self.chat_language = chat_language
+    def __init__(self):
+        """Initialize PlatformDetector."""
+        pass
 
     def normalize_language(self, lang_code):
         """Convert a locale code to a readable language name.
@@ -72,11 +68,14 @@ class PlatformDetector:
         primary_lang_code = lang_code.replace("-", "_").split("_")[0].lower()
         return fallback.get(primary_lang_code, lang_code)
 
-    def get_user_language(self):
+    def get_user_language(self, chat_language=None):
         """Detect the user's language preference.
 
+        Args:
+            chat_language: Optional explicit language override
+
         Detection order:
-        1. self.chat_language if explicitly set
+        1. chat_language parameter if explicitly set
         2. locale.getlocale()
         3. LANG / LANGUAGE / LC_ALL / LC_MESSAGES environment variables
 
@@ -84,8 +83,8 @@ class PlatformDetector:
             Human-readable language name like 'English', or None
         """
         # Explicit override
-        if self.chat_language:
-            return self.normalize_language(self.chat_language)
+        if chat_language:
+            return self.normalize_language(chat_language)
 
         # System locale
         try:

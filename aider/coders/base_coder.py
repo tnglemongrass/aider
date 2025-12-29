@@ -389,7 +389,7 @@ class Coder:
         self.io = io
 
         # Initialize helper classes
-        self.platform_detector = PlatformDetector(chat_language)
+        self.platform_detector = PlatformDetector()
 
         self.shell_commands = []
 
@@ -546,59 +546,80 @@ class Coder:
     # Properties for backward compatibility with token calculator
     @property
     def total_cost(self):
-        return self.token_calculator.total_cost
+        if hasattr(self, 'token_calculator'):
+            return self.token_calculator.total_cost
+        return 0.0
 
     @total_cost.setter
     def total_cost(self, value):
-        self.token_calculator.total_cost = value
+        if hasattr(self, 'token_calculator'):
+            self.token_calculator.total_cost = value
 
     @property
     def total_tokens_sent(self):
-        return self.token_calculator.total_tokens_sent
+        if hasattr(self, 'token_calculator'):
+            return self.token_calculator.total_tokens_sent
+        return 0
 
     @total_tokens_sent.setter
     def total_tokens_sent(self, value):
-        self.token_calculator.total_tokens_sent = value
+        if hasattr(self, 'token_calculator'):
+            self.token_calculator.total_tokens_sent = value
 
     @property
     def total_tokens_received(self):
-        return self.token_calculator.total_tokens_received
+        if hasattr(self, 'token_calculator'):
+            return self.token_calculator.total_tokens_received
+        return 0
 
     @total_tokens_received.setter
     def total_tokens_received(self, value):
-        self.token_calculator.total_tokens_received = value
+        if hasattr(self, 'token_calculator'):
+            self.token_calculator.total_tokens_received = value
 
     @property
     def message_cost(self):
-        return self.token_calculator.message_cost
+        if hasattr(self, 'token_calculator'):
+            return self.token_calculator.message_cost
+        return 0.0
 
     @message_cost.setter
     def message_cost(self, value):
-        self.token_calculator.message_cost = value
+        if hasattr(self, 'token_calculator'):
+            self.token_calculator.message_cost = value
 
     @property
     def message_tokens_sent(self):
-        return self.token_calculator.message_tokens_sent
+        if hasattr(self, 'token_calculator'):
+            return self.token_calculator.message_tokens_sent
+        return 0
 
     @message_tokens_sent.setter
     def message_tokens_sent(self, value):
-        self.token_calculator.message_tokens_sent = value
+        if hasattr(self, 'token_calculator'):
+            self.token_calculator.message_tokens_sent = value
 
     @property
     def message_tokens_received(self):
-        return self.token_calculator.message_tokens_received
+        if hasattr(self, 'token_calculator'):
+            return self.token_calculator.message_tokens_received
+        return 0
 
     @message_tokens_received.setter
     def message_tokens_received(self, value):
-        self.token_calculator.message_tokens_received = value
+        if hasattr(self, 'token_calculator'):
+            self.token_calculator.message_tokens_received = value
 
     @property
     def usage_report(self):
-        return self.token_calculator.usage_report
+        if hasattr(self, 'token_calculator'):
+            return self.token_calculator.usage_report
+        return None
 
     @usage_report.setter
     def usage_report(self, value):
-        self.token_calculator.usage_report = value
+        if hasattr(self, 'token_calculator'):
+            self.token_calculator.usage_report = value
 
     def show_announcements(self):
         bold = True
@@ -1058,7 +1079,29 @@ class Coder:
         return self.platform_detector.normalize_language(lang_code)
 
     def get_user_language(self):
-        return self.platform_detector.get_user_language()
+        # Explicit override
+        if self.chat_language:
+            return self.normalize_language(self.chat_language)
+
+        # System locale
+        try:
+            import locale
+            lang = locale.getlocale()[0]
+            if lang:
+                lang = self.normalize_language(lang)
+            if lang:
+                return lang
+        except Exception:
+            pass
+
+        # Environment variables
+        for env_var in ("LANG", "LANGUAGE", "LC_ALL", "LC_MESSAGES"):
+            lang = os.environ.get(env_var)
+            if lang:
+                lang = lang.split(".")[0]  # Strip encoding if present
+                return self.normalize_language(lang)
+
+        return None
 
     def get_platform_info(self):
         return self.platform_detector.get_platform_info(
