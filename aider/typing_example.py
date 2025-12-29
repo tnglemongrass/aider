@@ -136,9 +136,29 @@ class FileProcessor:
         return len(self.processed_files)
 
 
-# Type aliases for complex types
+# Type aliases for complex types - helps keep function signatures readable
 FileMetadata = Dict[str, Union[str, int, bool]]
-ProcessResult = Tuple[bool, Optional[str]]
+ProcessResult = Tuple[bool, Optional[str]]  # Example: (success, error_message)
+
+
+def validate_file(file_path: str) -> ProcessResult:
+    """
+    Validate a file and return processing result.
+
+    Args:
+        file_path: Path to the file to validate
+
+    Returns:
+        Tuple of (success: bool, error_message: Optional[str])
+    """
+    path = Path(file_path)
+    if not path.exists():
+        return False, f"File not found: {file_path}"
+    if not path.is_file():
+        return False, f"Not a file: {file_path}"
+    if path.stat().st_size == 0:
+        return False, f"File is empty: {file_path}"
+    return True, None
 
 
 def advanced_process(

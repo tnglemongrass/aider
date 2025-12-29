@@ -16,6 +16,7 @@ from aider.typing_example import (
     get_file_stats,
     process_file,
     split_path,
+    validate_file,
 )
 
 
@@ -142,3 +143,43 @@ def test_advanced_process_empty_list() -> None:
     """Test advanced processing with empty file list."""
     results = advanced_process([])
     assert results == []
+
+
+def test_validate_file_success(tmp_path: Path) -> None:
+    """Test validating a valid file."""
+    test_file = tmp_path / "valid.txt"
+    test_file.write_text("content")
+
+    success, error = validate_file(str(test_file))
+    assert success is True
+    assert error is None
+
+
+def test_validate_file_not_exists() -> None:
+    """Test validating a non-existent file."""
+    success, error = validate_file("/nonexistent/file.txt")
+    assert success is False
+    assert error is not None
+    assert "not found" in error.lower()
+
+
+def test_validate_file_empty(tmp_path: Path) -> None:
+    """Test validating an empty file."""
+    test_file = tmp_path / "empty.txt"
+    test_file.write_text("")
+
+    success, error = validate_file(str(test_file))
+    assert success is False
+    assert error is not None
+    assert "empty" in error.lower()
+
+
+def test_validate_file_not_a_file(tmp_path: Path) -> None:
+    """Test validating a directory instead of a file."""
+    subdir = tmp_path / "subdir"
+    subdir.mkdir()
+
+    success, error = validate_file(str(subdir))
+    assert success is False
+    assert error is not None
+    assert "not a file" in error.lower()
