@@ -141,7 +141,7 @@ class TokenCalculator:
         if input_cost_per_token_cache_hit:
             # must be deepseek
             cost += input_cost_per_token_cache_hit * cache_hit_tokens
-            cost += (prompt_tokens - input_cost_per_token_cache_hit) * input_cost_per_token
+            cost += (prompt_tokens - cache_hit_tokens) * input_cost_per_token
         else:
             # hard code the anthropic adjustments, no-ops for other models since cache_x_tokens==0
             cost += cache_write_tokens * input_cost_per_token * 1.25
