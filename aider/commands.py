@@ -1412,7 +1412,7 @@ class Commands:
             self.io.tool_output("The repo map has been refreshed, use /map to view it.")
 
     def cmd_map_tokens(self, args):
-        "Set the map token budget (eg: 2048, 4k), or 0 to disable"
+        "Set the map token budget (eg: 2048, 4k), 0 to disable, or -1 for default"
 
         if not args.strip():
             # Display current value if no args are provided
@@ -1428,7 +1428,7 @@ class Commands:
 
         value = args.strip()
 
-        # Parse the value (support formats like "2048", "4k", "1.5k")
+        # Parse the value (support formats like "2048", "4k", "1.5k", "-1")
         try:
             if value.lower().endswith('k'):
                 # Parse values like "4k", "1.5k"
@@ -1444,9 +1444,23 @@ class Commands:
             self.io.tool_error(f"Invalid map token value: {value}")
             return
 
-        # Ensure non-negative
+        # Handle -1 to restore default
+        if map_tokens == -1:
+            if not self.coder.repo_map:
+                self.io.tool_output("Repo map is not available.")
+                return
+            default_tokens = int(self.coder.main_model.get_repo_map_tokens())
+            map_tokens = default_tokens
+            self.coder.repo_map.max_map_tokens = map_tokens
+            self.io.tool_output(f"Restored default map token budget to {map_tokens:,} tokens.")
+            self.io.tool_output()
+            announcements = "\n".join(self.coder.get_announcements())
+            self.io.tool_output(announcements)
+            return
+
+        # Ensure non-negative (except -1 which was handled above)
         if map_tokens < 0:
-            self.io.tool_error("Map token value must be non-negative.")
+            self.io.tool_error("Map token value must be non-negative (or -1 for default).")
             return
 
         # Update the repo_map if it exists
