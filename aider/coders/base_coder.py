@@ -3,25 +3,14 @@
 import base64
 import hashlib
 import json
-import locale
-import math
 import mimetypes
 import os
-import platform
 import re
 import sys
 import threading
 import time
 import traceback
 from collections import defaultdict
-from datetime import datetime
-
-# Optional dependency: used to convert locale codes (eg ``en_US``)
-# into human-readable language names (eg ``English``).
-try:
-    from babel import Locale  # type: ignore
-except ImportError:  # Babel not installed – we will fall back to a small mapping
-    Locale = None
 from json.decoder import JSONDecodeError
 from pathlib import Path
 from typing import List
@@ -46,11 +35,14 @@ from aider.reasoning_tags import (
 from aider.repo import ANY_GIT_ERROR, GitRepo
 from aider.repomap import RepoMap
 from aider.run_cmd import run_cmd
-from aider.utils import format_content, format_messages, format_tokens, is_image_file
+from aider.utils import format_content, format_messages, is_image_file
 from aider.waiting import WaitingSpinner
 
 from ..dump import dump  # noqa: F401
 from .chat_chunks import ChatChunks
+from .file_manager import FileManager
+from .platform_detector import PlatformDetector
+from .token_calculator import TokenCalculator
 
 
 class UnknownEditFormat(ValueError):
@@ -348,7 +340,6 @@ class Coder:
         self.commit_before_message = []
         self.aider_commit_hashes = set()
         self.rejected_urls = set()
-        self.abs_root_path_cache = {}
 
         self.auto_copy_context = auto_copy_context
         self.auto_accept_architect = auto_accept_architect
@@ -381,12 +372,6 @@ class Coder:
         self.chat_completion_response_hashes = []
         self.need_commit_before_edits = set()
 
-        self.total_cost = total_cost
-        self.total_tokens_sent = total_tokens_sent
-        self.total_tokens_received = total_tokens_received
-        self.message_tokens_sent = 0
-        self.message_tokens_received = 0
-
         self.verbose = verbose
         self.abs_fnames = set()
         self.abs_read_only_fnames = set()
@@ -403,7 +388,10 @@ class Coder:
             self.done_messages = []
 
         self.io = io
-
+        
+        # Initialize helper classes
+        self.platform_detector = PlatformDetector(chat_language)
+        
         self.shell_commands = []
 
         if not auto_commits:
@@ -420,6 +408,12 @@ class Coder:
         self.reasoning_tag_name = (
             self.main_model.reasoning_tag if self.main_model.reasoning_tag else REASONING_TAG
         )
+        
+        # Initialize token calculator
+        self.token_calculator = TokenCalculator(main_model, io)
+        self.token_calculator.total_cost = total_cost
+        self.token_calculator.total_tokens_sent = total_tokens_sent
+        self.token_calculator.total_tokens_received = total_tokens_received
 
         self.stream = stream and main_model.streaming
 
@@ -474,6 +468,9 @@ class Coder:
 
         if not self.repo:
             self.root = utils.find_common_root(self.abs_fnames)
+        
+        # Initialize file manager after root is determined
+        self.file_manager = FileManager(self.root, io, self.abs_fnames, self.abs_read_only_fnames)
 
         if read_only_fnames:
             self.abs_read_only_fnames = set()
@@ -546,6 +543,63 @@ class Coder:
             return
         for lang, cmd in lint_cmds.items():
             self.linter.set_linter(lang, cmd)
+    
+    # Properties for backward compatibility with token calculator
+    @property
+    def total_cost(self):
+        return self.token_calculator.total_cost
+    
+    @total_cost.setter
+    def total_cost(self, value):
+        self.token_calculator.total_cost = value
+    
+    @property
+    def total_tokens_sent(self):
+        return self.token_calculator.total_tokens_sent
+    
+    @total_tokens_sent.setter
+    def total_tokens_sent(self, value):
+        self.token_calculator.total_tokens_sent = value
+    
+    @property
+    def total_tokens_received(self):
+        return self.token_calculator.total_tokens_received
+    
+    @total_tokens_received.setter
+    def total_tokens_received(self, value):
+        self.token_calculator.total_tokens_received = value
+    
+    @property
+    def message_cost(self):
+        return self.token_calculator.message_cost
+    
+    @message_cost.setter
+    def message_cost(self, value):
+        self.token_calculator.message_cost = value
+    
+    @property
+    def message_tokens_sent(self):
+        return self.token_calculator.message_tokens_sent
+    
+    @message_tokens_sent.setter
+    def message_tokens_sent(self, value):
+        self.token_calculator.message_tokens_sent = value
+    
+    @property
+    def message_tokens_received(self):
+        return self.token_calculator.message_tokens_received
+    
+    @message_tokens_received.setter
+    def message_tokens_received(self, value):
+        self.token_calculator.message_tokens_received = value
+    
+    @property
+    def usage_report(self):
+        return self.token_calculator.usage_report
+    
+    @usage_report.setter
+    def usage_report(self, value):
+        self.token_calculator.usage_report = value
 
     def show_announcements(self):
         bold = True
@@ -554,24 +608,14 @@ class Coder:
             bold = False
 
     def add_rel_fname(self, rel_fname):
-        self.abs_fnames.add(self.abs_root_path(rel_fname))
+        self.file_manager.add_rel_fname(rel_fname)
         self.check_added_files()
 
     def drop_rel_fname(self, fname):
-        abs_fname = self.abs_root_path(fname)
-        if abs_fname in self.abs_fnames:
-            self.abs_fnames.remove(abs_fname)
-            return True
+        return self.file_manager.drop_rel_fname(fname)
 
     def abs_root_path(self, path):
-        key = path
-        if key in self.abs_root_path_cache:
-            return self.abs_root_path_cache[key]
-
-        res = Path(self.root) / path
-        res = utils.safe_abs_path(res)
-        self.abs_root_path_cache[key] = res
-        return res
+        return self.file_manager.abs_root_path(path)
 
     fences = all_fences
     fence = fences[0]
@@ -596,15 +640,7 @@ class Coder:
                 self.waiting_spinner = None
 
     def get_abs_fnames_content(self):
-        for fname in list(self.abs_fnames):
-            content = self.io.read_text(fname)
-
-            if content is None:
-                relative_fname = self.get_rel_fname(fname)
-                self.io.tool_warning(f"Dropping {relative_fname} from the chat.")
-                self.abs_fnames.remove(fname)
-            else:
-                yield fname, content
+        return self.file_manager.get_abs_fnames_content()
 
     def choose_fence(self):
         all_content = ""
@@ -638,36 +674,10 @@ class Coder:
         if not fnames:
             fnames = self.abs_fnames
 
-        prompt = ""
-        for fname, content in self.get_abs_fnames_content():
-            if not is_image_file(fname):
-                relative_fname = self.get_rel_fname(fname)
-                prompt += "\n"
-                prompt += relative_fname
-                prompt += f"\n{self.fence[0]}\n"
-
-                prompt += content
-
-                # lines = content.splitlines(keepends=True)
-                # lines = [f"{i+1:03}:{line}" for i, line in enumerate(lines)]
-                # prompt += "".join(lines)
-
-                prompt += f"{self.fence[1]}\n"
-
-        return prompt
+        return self.file_manager.get_files_content(self.fence)
 
     def get_read_only_files_content(self):
-        prompt = ""
-        for fname in self.abs_read_only_fnames:
-            content = self.io.read_text(fname)
-            if content is not None and not is_image_file(fname):
-                relative_fname = self.get_rel_fname(fname)
-                prompt += "\n"
-                prompt += relative_fname
-                prompt += f"\n{self.fence[0]}\n"
-                prompt += content
-                prompt += f"{self.fence[1]}\n"
-        return prompt
+        return self.file_manager.get_read_only_files_content(self.fence)
 
     def get_cur_message_text(self):
         text = ""
@@ -1046,130 +1056,19 @@ class Coder:
         self.cur_messages = []
 
     def normalize_language(self, lang_code):
-        """
-        Convert a locale code such as ``en_US`` or ``fr`` into a readable
-        language name (e.g. ``English`` or ``French``).  If Babel is
-        available it is used for reliable conversion; otherwise a small
-        built-in fallback map handles common languages.
-        """
-        if not lang_code:
-            return None
-
-        if lang_code.upper() in ("C", "POSIX"):
-            return None
-
-        # Probably already a language name
-        if (
-            len(lang_code) > 3
-            and "_" not in lang_code
-            and "-" not in lang_code
-            and lang_code[0].isupper()
-        ):
-            return lang_code
-
-        # Preferred: Babel
-        if Locale is not None:
-            try:
-                loc = Locale.parse(lang_code.replace("-", "_"))
-                return loc.get_display_name("en").capitalize()
-            except Exception:
-                pass  # Fall back to manual mapping
-
-        # Simple fallback for common languages
-        fallback = {
-            "en": "English",
-            "fr": "French",
-            "es": "Spanish",
-            "de": "German",
-            "it": "Italian",
-            "pt": "Portuguese",
-            "zh": "Chinese",
-            "ja": "Japanese",
-            "ko": "Korean",
-            "ru": "Russian",
-        }
-        primary_lang_code = lang_code.replace("-", "_").split("_")[0].lower()
-        return fallback.get(primary_lang_code, lang_code)
+        return self.platform_detector.normalize_language(lang_code)
 
     def get_user_language(self):
-        """
-        Detect the user's language preference and return a human-readable
-        language name such as ``English``. Detection order:
-
-        1. ``self.chat_language`` if explicitly set
-        2. ``locale.getlocale()``
-        3. ``LANG`` / ``LANGUAGE`` / ``LC_ALL`` / ``LC_MESSAGES`` environment variables
-        """
-
-        # Explicit override
-        if self.chat_language:
-            return self.normalize_language(self.chat_language)
-
-        # System locale
-        try:
-            lang = locale.getlocale()[0]
-            if lang:
-                lang = self.normalize_language(lang)
-            if lang:
-                return lang
-        except Exception:
-            pass
-
-        # Environment variables
-        for env_var in ("LANG", "LANGUAGE", "LC_ALL", "LC_MESSAGES"):
-            lang = os.environ.get(env_var)
-            if lang:
-                lang = lang.split(".")[0]  # Strip encoding if present
-                return self.normalize_language(lang)
-
-        return None
+        return self.platform_detector.get_user_language()
 
     def get_platform_info(self):
-        platform_text = ""
-        try:
-            platform_text = f"- Platform: {platform.platform()}\n"
-        except KeyError:
-            # Skip platform info if it can't be retrieved
-            platform_text = "- Platform information unavailable\n"
-
-        shell_var = "COMSPEC" if os.name == "nt" else "SHELL"
-        shell_val = os.getenv(shell_var)
-        platform_text += f"- Shell: {shell_var}={shell_val}\n"
-
-        user_lang = self.get_user_language()
-        if user_lang:
-            platform_text += f"- Language: {user_lang}\n"
-
-        dt = datetime.now().astimezone().strftime("%Y-%m-%d")
-        platform_text += f"- Current date: {dt}\n"
-
-        if self.repo:
-            platform_text += "- The user is operating inside a git repository\n"
-
-        if self.lint_cmds:
-            if self.auto_lint:
-                platform_text += (
-                    "- The user's pre-commit runs these lint commands, don't suggest running"
-                    " them:\n"
-                )
-            else:
-                platform_text += "- The user prefers these lint commands:\n"
-            for lang, cmd in self.lint_cmds.items():
-                if lang is None:
-                    platform_text += f"  - {cmd}\n"
-                else:
-                    platform_text += f"  - {lang}: {cmd}\n"
-
-        if self.test_cmd:
-            if self.auto_test:
-                platform_text += (
-                    "- The user's pre-commit runs this test command, don't suggest running them: "
-                )
-            else:
-                platform_text += "- The user prefers this test command: "
-            platform_text += self.test_cmd + "\n"
-
-        return platform_text
+        return self.platform_detector.get_platform_info(
+            repo=self.repo,
+            lint_cmds=self.lint_cmds,
+            auto_lint=self.auto_lint,
+            test_cmd=self.test_cmd,
+            auto_test=self.auto_test,
+        )
 
     def fmt_system_prompt(self, prompt):
         final_reminders = []
@@ -1394,27 +1293,7 @@ class Coder:
         return chunks
 
     def check_tokens(self, messages):
-        """Check if the messages will fit within the model's token limits."""
-        input_tokens = self.main_model.token_count(messages)
-        max_input_tokens = self.main_model.info.get("max_input_tokens") or 0
-
-        if max_input_tokens and input_tokens >= max_input_tokens:
-            self.io.tool_error(
-                f"Your estimated chat context of {input_tokens:,} tokens exceeds the"
-                f" {max_input_tokens:,} token limit for {self.main_model.name}!"
-            )
-            self.io.tool_output("To reduce the chat context:")
-            self.io.tool_output("- Use /drop to remove unneeded files from the chat")
-            self.io.tool_output("- Use /clear to clear the chat history")
-            self.io.tool_output("- Break your code into smaller files")
-            self.io.tool_output(
-                "It's probably safe to try and send the request, most providers won't charge if"
-                " the context limit is exceeded."
-            )
-
-            if not self.io.confirm_ask("Try to proceed anyway?"):
-                return False
-        return True
+        return self.token_calculator.check_tokens(messages)
 
     def send_message(self, inp):
         self.event("message_send_starting")
@@ -1992,138 +1871,28 @@ class Coder:
         )
 
     def calculate_and_show_tokens_and_cost(self, messages, completion=None):
-        prompt_tokens = 0
-        completion_tokens = 0
-        cache_hit_tokens = 0
-        cache_write_tokens = 0
-
-        if completion and hasattr(completion, "usage") and completion.usage is not None:
-            prompt_tokens = completion.usage.prompt_tokens
-            completion_tokens = completion.usage.completion_tokens
-            cache_hit_tokens = getattr(completion.usage, "prompt_cache_hit_tokens", 0) or getattr(
-                completion.usage, "cache_read_input_tokens", 0
-            )
-            cache_write_tokens = getattr(completion.usage, "cache_creation_input_tokens", 0)
-
-            if hasattr(completion.usage, "cache_read_input_tokens") or hasattr(
-                completion.usage, "cache_creation_input_tokens"
-            ):
-                self.message_tokens_sent += prompt_tokens
-                self.message_tokens_sent += cache_write_tokens
-            else:
-                self.message_tokens_sent += prompt_tokens
-
-        else:
-            prompt_tokens = self.main_model.token_count(messages)
-            completion_tokens = self.main_model.token_count(self.partial_response_content)
-            self.message_tokens_sent += prompt_tokens
-
-        self.message_tokens_received += completion_tokens
-
-        tokens_report = f"Tokens: {format_tokens(self.message_tokens_sent)} sent"
-
-        if cache_write_tokens:
-            tokens_report += f", {format_tokens(cache_write_tokens)} cache write"
-        if cache_hit_tokens:
-            tokens_report += f", {format_tokens(cache_hit_tokens)} cache hit"
-        tokens_report += f", {format_tokens(self.message_tokens_received)} received."
-
-        if not self.main_model.info.get("input_cost_per_token"):
-            self.usage_report = tokens_report
-            return
-
-        try:
-            # Try and use litellm's built in cost calculator. Seems to work for non-streaming only?
-            cost = litellm.completion_cost(completion_response=completion)
-        except Exception:
-            cost = 0
-
-        if not cost:
-            cost = self.compute_costs_from_tokens(
-                prompt_tokens, completion_tokens, cache_write_tokens, cache_hit_tokens
-            )
-
-        self.total_cost += cost
-        self.message_cost += cost
-
-        def format_cost(value):
-            if value == 0:
-                return "0.00"
-            magnitude = abs(value)
-            if magnitude >= 0.01:
-                return f"{value:.2f}"
-            else:
-                return f"{value:.{max(2, 2 - int(math.log10(magnitude)))}f}"
-
-        cost_report = (
-            f"Cost: ${format_cost(self.message_cost)} message,"
-            f" ${format_cost(self.total_cost)} session."
-        )
-
-        if cache_hit_tokens and cache_write_tokens:
-            sep = "\n"
-        else:
-            sep = " "
-
-        self.usage_report = tokens_report + sep + cost_report
+        self.token_calculator.calculate_and_show_tokens_and_cost(messages, completion)
+        # Update local references for backwards compatibility
+        self.usage_report = self.token_calculator.usage_report
+        self.message_tokens_sent = self.token_calculator.message_tokens_sent
+        self.message_tokens_received = self.token_calculator.message_tokens_received
 
     def compute_costs_from_tokens(
         self, prompt_tokens, completion_tokens, cache_write_tokens, cache_hit_tokens
     ):
-        cost = 0
-
-        input_cost_per_token = self.main_model.info.get("input_cost_per_token") or 0
-        output_cost_per_token = self.main_model.info.get("output_cost_per_token") or 0
-        input_cost_per_token_cache_hit = (
-            self.main_model.info.get("input_cost_per_token_cache_hit") or 0
+        return self.token_calculator.compute_costs_from_tokens(
+            prompt_tokens, completion_tokens, cache_write_tokens, cache_hit_tokens
         )
-
-        # deepseek
-        # prompt_cache_hit_tokens + prompt_cache_miss_tokens
-        #    == prompt_tokens == total tokens that were sent
-        #
-        # Anthropic
-        # cache_creation_input_tokens + cache_read_input_tokens + prompt
-        #    == total tokens that were
-
-        if input_cost_per_token_cache_hit:
-            # must be deepseek
-            cost += input_cost_per_token_cache_hit * cache_hit_tokens
-            cost += (prompt_tokens - input_cost_per_token_cache_hit) * input_cost_per_token
-        else:
-            # hard code the anthropic adjustments, no-ops for other models since cache_x_tokens==0
-            cost += cache_write_tokens * input_cost_per_token * 1.25
-            cost += cache_hit_tokens * input_cost_per_token * 0.10
-            cost += prompt_tokens * input_cost_per_token
-
-        cost += completion_tokens * output_cost_per_token
-        return cost
 
     def show_usage_report(self):
-        if not self.usage_report:
-            return
-
-        self.total_tokens_sent += self.message_tokens_sent
-        self.total_tokens_received += self.message_tokens_received
-
-        self.io.tool_output(self.usage_report)
-
-        prompt_tokens = self.message_tokens_sent
-        completion_tokens = self.message_tokens_received
-        self.event(
-            "message_send",
-            main_model=self.main_model,
-            edit_format=self.edit_format,
-            prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens,
-            total_tokens=prompt_tokens + completion_tokens,
-            cost=self.message_cost,
-            total_cost=self.total_cost,
-        )
-
-        self.message_cost = 0.0
-        self.message_tokens_sent = 0
-        self.message_tokens_received = 0
+        self.token_calculator.show_usage_report(event_callback=self.event, edit_format=self.edit_format)
+        # Update local references for backwards compatibility
+        self.total_cost = self.token_calculator.total_cost
+        self.total_tokens_sent = self.token_calculator.total_tokens_sent
+        self.total_tokens_received = self.token_calculator.total_tokens_received
+        self.message_cost = self.token_calculator.message_cost
+        self.message_tokens_sent = self.token_calculator.message_tokens_sent
+        self.message_tokens_received = self.token_calculator.message_tokens_received
 
     def get_multi_response_content_in_progress(self, final=False):
         cur = self.multi_response_content or ""
@@ -2135,20 +1904,13 @@ class Coder:
         return cur + new
 
     def get_rel_fname(self, fname):
-        try:
-            return os.path.relpath(fname, self.root)
-        except ValueError:
-            return fname
+        return self.file_manager.get_rel_fname(fname)
 
     def get_inchat_relative_files(self):
-        files = [self.get_rel_fname(fname) for fname in self.abs_fnames]
-        return sorted(set(files))
+        return self.file_manager.get_inchat_relative_files()
 
     def is_file_safe(self, fname):
-        try:
-            return Path(self.abs_root_path(fname)).is_file()
-        except OSError:
-            return
+        return self.file_manager.is_file_safe(fname)
 
     def get_all_relative_files(self):
         if self.repo:
