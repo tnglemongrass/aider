@@ -218,6 +218,12 @@ def get_parser(default_config_files, git_root):
         ),
     )
     group.add_argument(
+        "--max-tokens",
+        type=int,
+        default=None,
+        help="Override model's max_input_tokens context window",
+    )
+    group.add_argument(
         "--max-chat-history-tokens",
         type=int,
         default=None,

@@ -216,6 +216,26 @@ class Commands:
         else:
             self.io.tool_output("Please provide a partial model name to search for.")
 
+    def cmd_max_tokens(self, args):
+        "Get or set max_input_tokens for the model"
+
+        args = args.strip()
+
+        if not args:
+            max_tok = self.coder.main_model.info.get("max_input_tokens", "unknown")
+            self.io.tool_output(f"max_input_tokens: {max_tok}")
+            return
+
+        try:
+            max_tok = int(args)
+        except ValueError:
+            self.io.tool_error(f"Invalid max_tokens: {args}")
+            return
+
+        self.coder.main_model.info["max_input_tokens"] = max_tok
+        self.coder.main_model.max_chat_history_tokens = min(max(max_tok / 16, 1024), 8192)
+        self.io.tool_output(f"Set max_input_tokens to {max_tok}")
+
     def cmd_web(self, args, return_content=False):
         "Scrape a webpage, convert to markdown and send in a message"
 

@@ -748,7 +748,7 @@ class Model(ModelSettings):
         map_tokens = 1024
         max_inp_tokens = self.info.get("max_input_tokens")
         if max_inp_tokens:
-            map_tokens = max_inp_tokens / 8
+            map_tokens = max_inp_tokens // 8
             map_tokens = min(map_tokens, 4096)
             map_tokens = max(map_tokens, 1024)
         return map_tokens

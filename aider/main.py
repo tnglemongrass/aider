@@ -827,6 +827,10 @@ def main(argv=None, input=None, output=None, force_git_root=None, return_coder=F
         verbose=args.verbose,
     )
 
+    if args.max_tokens:
+        main_model.info["max_input_tokens"] = args.max_tokens
+        main_model.max_chat_history_tokens = min(max(args.max_tokens / 16, 1024), 8192)
+
     # Check if deprecated remove_reasoning is set
     if main_model.remove_reasoning is not None:
         io.tool_warning(
