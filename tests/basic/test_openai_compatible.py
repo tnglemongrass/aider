@@ -102,9 +102,10 @@ def test_openai_compatible_handles_api_failure(monkeypatch, tmp_path):
     """
     OpenAICompatibleModelManager should gracefully handle API failures.
     """
+    import requests
 
     def mock_get(*args, **kwargs):
-        raise Exception("Network error")
+        raise requests.RequestException("Network error")
 
     monkeypatch.setattr("requests.get", mock_get)
     monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))

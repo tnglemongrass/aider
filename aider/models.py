@@ -159,7 +159,7 @@ class ModelInfoManager:
 
         # Manager for the cached OpenRouter model database
         self.openrouter_manager = OpenRouterModelManager()
-        
+
         # Manager for OpenAI-compatible endpoints
         self.openai_compatible_manager = OpenAICompatibleModelManager()
 
@@ -1258,16 +1258,14 @@ def print_matching_models(io, search):
 def get_openai_compatible_models():
     """
     Get models from an OpenAI-compatible endpoint if OPENAI_API_BASE is set.
-    
+
     Returns:
         List of model names from the custom endpoint, or empty list if not configured.
     """
-    import os
-    
     api_base = os.environ.get("OPENAI_API_BASE")
     if not api_base:
         return []
-    
+
     try:
         models = model_info_manager.openai_compatible_manager.get_models(api_base)
         return models

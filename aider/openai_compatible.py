@@ -90,7 +90,7 @@ class OpenAICompatibleModelManager:
                 if "data" in data and isinstance(data["data"], list):
                     models = [model.get("id") for model in data["data"] if model.get("id")]
                     return models
-        except Exception:
+        except (requests.RequestException, json.JSONDecodeError, ValueError):
             # Silently fail - user might not have connectivity or endpoint might not be
             # valid
             pass
@@ -100,7 +100,7 @@ class OpenAICompatibleModelManager:
     def _get_cache_file(self, api_base: str) -> Path:
         """Get the cache file path for a given API base URL."""
         # Create a safe filename from the URL
-        url_hash = hashlib.md5(api_base.encode()).hexdigest()[:16]
+        url_hash = hashlib.sha256(api_base.encode()).hexdigest()[:16]
         return self.cache_dir / f"{self.cache_file_prefix}_{url_hash}.json"
 
     def _load_cache(self, api_base: str) -> Optional[List[str]]:
