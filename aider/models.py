@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Optional, Union
 
 import json5
+import requests
 import yaml
 from PIL import Image
 
@@ -1269,7 +1270,7 @@ def get_openai_compatible_models():
     try:
         models = model_info_manager.openai_compatible_manager.get_models(api_base)
         return models
-    except Exception:
+    except (requests.RequestException, json.JSONDecodeError, ValueError, AttributeError):
         # Silently fail if we can't fetch models from the custom endpoint
         return []
 

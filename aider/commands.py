@@ -205,6 +205,8 @@ class Commands:
     def completions_model(self):
         model_list = list(litellm.model_cost.keys())
         # Add models from OpenAI-compatible endpoints if configured
+        # Note: get_openai_compatible_models() uses both memory and disk caching
+        # with 24-hour TTL, so repeated calls are fast
         openai_compatible_models = models.get_openai_compatible_models()
         model_list.extend(openai_compatible_models)
         return model_list
