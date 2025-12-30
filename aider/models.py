@@ -1200,30 +1200,39 @@ def fuzzy_match_models(name):
     name = name.lower()
 
     chat_models = set()
-    model_metadata = list(litellm.model_cost.items())
-    model_metadata += list(model_info_manager.local_model_metadata.items())
 
-    for orig_model, attrs in model_metadata:
-        model = orig_model.lower()
-        if attrs.get("mode") != "chat":
-            continue
-        provider = attrs.get("litellm_provider", "").lower()
-        if not provider:
-            continue
-        provider += "/"
+    # If using a custom OpenAI-compatible endpoint, only show those models
+    # to avoid confusion with irrelevant provider models
+    if is_using_custom_endpoint():
+        openai_compatible_models = get_openai_compatible_models()
+        for model in openai_compatible_models:
+            chat_models.add(model)
+    else:
+        # Standard behavior: include all litellm models
+        model_metadata = list(litellm.model_cost.items())
+        model_metadata += list(model_info_manager.local_model_metadata.items())
 
-        if model.startswith(provider):
-            fq_model = orig_model
-        else:
-            fq_model = provider + orig_model
+        for orig_model, attrs in model_metadata:
+            model = orig_model.lower()
+            if attrs.get("mode") != "chat":
+                continue
+            provider = attrs.get("litellm_provider", "").lower()
+            if not provider:
+                continue
+            provider += "/"
 
-        chat_models.add(fq_model)
-        chat_models.add(orig_model)
+            if model.startswith(provider):
+                fq_model = orig_model
+            else:
+                fq_model = provider + orig_model
 
-    # Add models from OpenAI-compatible endpoints if configured
-    openai_compatible_models = get_openai_compatible_models()
-    for model in openai_compatible_models:
-        chat_models.add(model)
+            chat_models.add(fq_model)
+            chat_models.add(orig_model)
+
+        # Add models from OpenAI-compatible endpoints if configured
+        openai_compatible_models = get_openai_compatible_models()
+        for model in openai_compatible_models:
+            chat_models.add(model)
 
     chat_models = sorted(chat_models)
     # exactly matching model
@@ -1273,6 +1282,20 @@ def get_openai_compatible_models():
     except (requests.RequestException, json.JSONDecodeError, ValueError, AttributeError):
         # Silently fail if we can't fetch models from the custom endpoint
         return []
+
+
+def is_using_custom_endpoint():
+    """
+    Check if user has configured a custom OpenAI-compatible endpoint.
+
+    Returns:
+        True if OPENAI_API_BASE is set to a non-OpenAI URL.
+    """
+    api_base = os.environ.get("OPENAI_API_BASE", "")
+    if not api_base:
+        return False
+    # Consider it a custom endpoint if it's not the default OpenAI API
+    return "api.openai.com" not in api_base.lower()
 
 
 def get_model_settings_as_yaml():

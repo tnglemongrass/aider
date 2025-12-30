@@ -203,8 +203,13 @@ class Commands:
         )
 
     def completions_model(self):
+        # If using a custom OpenAI-compatible endpoint, only show those models
+        # to avoid confusion with irrelevant provider models
+        if models.is_using_custom_endpoint():
+            return models.get_openai_compatible_models()
+
+        # Standard behavior: include all litellm models plus any custom endpoint models
         model_list = list(litellm.model_cost.keys())
-        # Add models from OpenAI-compatible endpoints if configured
         # Note: get_openai_compatible_models() uses both memory and disk caching
         # with 24-hour TTL, so repeated calls are fast
         openai_compatible_models = models.get_openai_compatible_models()
