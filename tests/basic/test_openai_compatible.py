@@ -47,6 +47,7 @@ def test_openai_compatible_get_models_from_cache(monkeypatch, tmp_path):
 def test_openai_compatible_get_models_without_v1(monkeypatch, tmp_path):
     """
     OpenAICompatibleModelManager should handle API base URLs without /v1 suffix.
+    User must include /v1 in their base URL if the endpoint requires it.
     """
     payload = {
         "data": [
@@ -70,7 +71,8 @@ def test_openai_compatible_get_models_without_v1(monkeypatch, tmp_path):
     models = manager.get_models("https://api.example.com")
 
     assert len(models) == 2
-    assert requested_url == "https://api.example.com/v1/models"
+    # Should append /models to whatever base URL is provided
+    assert requested_url == "https://api.example.com/models"
 
 
 def test_openai_compatible_get_models_with_v1(monkeypatch, tmp_path):
@@ -98,6 +100,7 @@ def test_openai_compatible_get_models_with_v1(monkeypatch, tmp_path):
     models = manager.get_models("https://api.example.com/v1")
 
     assert len(models) == 1
+    # Should append /models to the /v1 base URL
     assert requested_url == "https://api.example.com/v1/models"
 
 

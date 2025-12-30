@@ -58,17 +58,19 @@ class OpenAICompatibleModelManager:
         if models:
             self._save_cache(api_base, models)
             self._models_cache[api_base] = (models, time.time())
+        else:
+            # Even if fetch failed, cache the empty result briefly to avoid
+            # hammering a failing endpoint (use shorter TTL: 5 minutes)
+            self._models_cache[api_base] = ([], time.time() - self.CACHE_TTL + 300)
 
         return models
 
     def _fetch_models(self, api_base: str) -> List[str]:
-        """Fetch models from the /v1/models endpoint."""
-        # Ensure the API base URL ends with /v1 or construct the full URL
+        """Fetch models from the /models endpoint."""
+        # Use the API base URL as-is, just ensure it doesn't end with a slash
+        # and append /models. Users should include /v1 in their base URL if needed.
         api_base = api_base.rstrip('/')
-        if not api_base.endswith('/v1'):
-            models_url = f"{api_base}/v1/models"
-        else:
-            models_url = f"{api_base}/models"
+        models_url = f"{api_base}/models"
 
         try:
             # Get API key if available
