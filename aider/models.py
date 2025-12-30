@@ -13,12 +13,14 @@ from pathlib import Path
 from typing import Optional, Union
 
 import json5
+import requests
 import yaml
 from PIL import Image
 
 from aider import __version__
 from aider.dump import dump  # noqa: F401
 from aider.llm import litellm
+from aider.openai_compatible import OpenAICompatibleModelManager
 from aider.openrouter import OpenRouterModelManager
 from aider.sendchat import ensure_alternating_roles, sanity_check_messages
 from aider.utils import check_pip_install_extra
@@ -159,10 +161,15 @@ class ModelInfoManager:
         # Manager for the cached OpenRouter model database
         self.openrouter_manager = OpenRouterModelManager()
 
+        # Manager for OpenAI-compatible endpoints
+        self.openai_compatible_manager = OpenAICompatibleModelManager()
+
     def set_verify_ssl(self, verify_ssl):
         self.verify_ssl = verify_ssl
         if hasattr(self, "openrouter_manager"):
             self.openrouter_manager.set_verify_ssl(verify_ssl)
+        if hasattr(self, "openai_compatible_manager"):
+            self.openai_compatible_manager.set_verify_ssl(verify_ssl)
 
     def _load_cache(self):
         if self._cache_loaded:
@@ -1193,25 +1200,39 @@ def fuzzy_match_models(name):
     name = name.lower()
 
     chat_models = set()
-    model_metadata = list(litellm.model_cost.items())
-    model_metadata += list(model_info_manager.local_model_metadata.items())
 
-    for orig_model, attrs in model_metadata:
-        model = orig_model.lower()
-        if attrs.get("mode") != "chat":
-            continue
-        provider = attrs.get("litellm_provider", "").lower()
-        if not provider:
-            continue
-        provider += "/"
+    # If using a custom OpenAI-compatible endpoint, only show those models
+    # to avoid confusion with irrelevant provider models
+    if is_using_custom_endpoint():
+        openai_compatible_models = get_openai_compatible_models()
+        for model in openai_compatible_models:
+            chat_models.add(model)
+    else:
+        # Standard behavior: include all litellm models
+        model_metadata = list(litellm.model_cost.items())
+        model_metadata += list(model_info_manager.local_model_metadata.items())
 
-        if model.startswith(provider):
-            fq_model = orig_model
-        else:
-            fq_model = provider + orig_model
+        for orig_model, attrs in model_metadata:
+            model = orig_model.lower()
+            if attrs.get("mode") != "chat":
+                continue
+            provider = attrs.get("litellm_provider", "").lower()
+            if not provider:
+                continue
+            provider += "/"
 
-        chat_models.add(fq_model)
-        chat_models.add(orig_model)
+            if model.startswith(provider):
+                fq_model = orig_model
+            else:
+                fq_model = provider + orig_model
+
+            chat_models.add(fq_model)
+            chat_models.add(orig_model)
+
+        # Add models from OpenAI-compatible endpoints if configured
+        openai_compatible_models = get_openai_compatible_models()
+        for model in openai_compatible_models:
+            chat_models.add(model)
 
     chat_models = sorted(chat_models)
     # exactly matching model
@@ -1242,6 +1263,42 @@ def print_matching_models(io, search):
             io.tool_output(f"- {model}")
     else:
         io.tool_output(f'No models match "{search}".')
+
+
+def get_openai_compatible_models():
+    """
+    Get models from an OpenAI-compatible endpoint if OPENAI_API_BASE is set.
+
+    Returns:
+        List of model names from the custom endpoint with 'openai/' prefix,
+        or empty list if not configured.
+    """
+    api_base = os.environ.get("OPENAI_API_BASE")
+    if not api_base:
+        return []
+
+    try:
+        models = model_info_manager.openai_compatible_manager.get_models(api_base)
+        # Add 'openai/' prefix so litellm routes these to the custom endpoint
+        return [f"openai/{model}" if not model.startswith("openai/") else model
+                for model in models]
+    except (requests.RequestException, json.JSONDecodeError, ValueError, AttributeError):
+        # Silently fail if we can't fetch models from the custom endpoint
+        return []
+
+
+def is_using_custom_endpoint():
+    """
+    Check if user has configured a custom OpenAI-compatible endpoint.
+
+    Returns:
+        True if OPENAI_API_BASE is set to a non-OpenAI URL.
+    """
+    api_base = os.environ.get("OPENAI_API_BASE", "")
+    if not api_base:
+        return False
+    # Consider it a custom endpoint if it's not the default OpenAI API
+    return "api.openai.com" not in api_base.lower()
 
 
 def get_model_settings_as_yaml():
