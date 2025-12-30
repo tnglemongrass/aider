@@ -1270,7 +1270,8 @@ def get_openai_compatible_models():
     Get models from an OpenAI-compatible endpoint if OPENAI_API_BASE is set.
 
     Returns:
-        List of model names from the custom endpoint, or empty list if not configured.
+        List of model names from the custom endpoint with 'openai/' prefix,
+        or empty list if not configured.
     """
     api_base = os.environ.get("OPENAI_API_BASE")
     if not api_base:
@@ -1278,7 +1279,9 @@ def get_openai_compatible_models():
 
     try:
         models = model_info_manager.openai_compatible_manager.get_models(api_base)
-        return models
+        # Add 'openai/' prefix so litellm routes these to the custom endpoint
+        return [f"openai/{model}" if not model.startswith("openai/") else model
+                for model in models]
     except (requests.RequestException, json.JSONDecodeError, ValueError, AttributeError):
         # Silently fail if we can't fetch models from the custom endpoint
         return []

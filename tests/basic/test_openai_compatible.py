@@ -157,6 +157,7 @@ def test_openai_compatible_caching(monkeypatch, tmp_path):
 def test_get_openai_compatible_models_with_env(monkeypatch, tmp_path):
     """
     get_openai_compatible_models should fetch models when OPENAI_API_BASE is set.
+    Models should have 'openai/' prefix for litellm routing.
     """
     payload = {
         "data": [
@@ -174,7 +175,7 @@ def test_get_openai_compatible_models_with_env(monkeypatch, tmp_path):
     fetched_models = get_openai_compatible_models()
 
     assert len(fetched_models) == 1
-    assert "env-model" in fetched_models
+    assert "openai/env-model" in fetched_models
 
 
 def test_get_openai_compatible_models_without_env(monkeypatch):
