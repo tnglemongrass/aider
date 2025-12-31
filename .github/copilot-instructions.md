@@ -15,7 +15,7 @@ Aider is an AI pair programming tool that works in your terminal. It allows deve
 - Maximum line length: 100 characters
 - Use Black for code formatting
 - Use isort for import sorting
-- **No type hints** - the project does not use type hints
+- Type hints are used selectively in the codebase
 
 ### Flake8 Configuration
 - Ignore: E203, W503
@@ -78,7 +78,7 @@ pytest tests/basic/test_coder.py::TestCoder::test_specific_case
 
 2. Compile requirements:
 ```bash
-pip install pip-tools
+# The project uses uv for dependency compilation
 ./scripts/pip-compile.sh
 ```
 
