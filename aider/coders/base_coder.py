@@ -41,6 +41,7 @@ from .chat_chunks import ChatChunks
 from .commit_manager import CommitManager
 from .file_manager import FileManager
 from .lint_test_manager import LintTestManager
+from .message_formatter import MessageFormatter
 from .platform_detector import PlatformDetector
 from .shell_command_manager import ShellCommandManager
 from .token_calculator import TokenCalculator
@@ -530,6 +531,9 @@ class Coder:
         if aider_commit_hashes:
             self.commit_manager.aider_commit_hashes = aider_commit_hashes
 
+        # Message formatting
+        self.message_formatter = MessageFormatter(main_model, self.gpt_prompts, io)
+
         # validate the functions jsonschema
         if self.functions:
             from jsonschema import Draft7Validator
@@ -824,113 +828,25 @@ class Coder:
         return repo_content
 
     def get_repo_messages(self):
-        repo_messages = []
-        repo_content = self.get_repo_map()
-        if repo_content:
-            repo_messages += [
-                dict(role="user", content=repo_content),
-                dict(
-                    role="assistant",
-                    content="Ok, I won't try and edit those files without asking first.",
-                ),
-            ]
-        return repo_messages
+        return self.message_formatter.get_repo_messages(self.get_repo_map)
 
     def get_readonly_files_messages(self):
-        readonly_messages = []
-
-        # Handle non-image files
-        read_only_content = self.get_read_only_files_content()
-        if read_only_content:
-            readonly_messages += [
-                dict(
-                    role="user", content=self.gpt_prompts.read_only_files_prefix + read_only_content
-                ),
-                dict(
-                    role="assistant",
-                    content="Ok, I will use these files as references.",
-                ),
-            ]
-
-        # Handle image files
-        images_message = self.get_images_message(self.abs_read_only_fnames)
-        if images_message is not None:
-            readonly_messages += [
-                images_message,
-                dict(role="assistant", content="Ok, I will use these images as references."),
-            ]
-
-        return readonly_messages
-
-    def get_chat_files_messages(self):
-        chat_files_messages = []
-        if self.abs_fnames:
-            files_content = self.gpt_prompts.files_content_prefix
-            files_content += self.get_files_content()
-            files_reply = self.gpt_prompts.files_content_assistant_reply
-        elif self.get_repo_map() and self.gpt_prompts.files_no_full_files_with_repo_map:
-            files_content = self.gpt_prompts.files_no_full_files_with_repo_map
-            files_reply = self.gpt_prompts.files_no_full_files_with_repo_map_reply
-        else:
-            files_content = self.gpt_prompts.files_no_full_files
-            files_reply = "Ok."
-
-        if files_content:
-            chat_files_messages += [
-                dict(role="user", content=files_content),
-                dict(role="assistant", content=files_reply),
-            ]
-
-        images_message = self.get_images_message(self.abs_fnames)
-        if images_message is not None:
-            chat_files_messages += [
-                images_message,
-                dict(role="assistant", content="Ok."),
-            ]
-
-        return chat_files_messages
-
-    def get_images_message(self, fnames):
-        supports_images = self.main_model.info.get("supports_vision")
-        supports_pdfs = self.main_model.info.get("supports_pdf_input") or self.main_model.info.get(
-            "max_pdf_size_mb"
+        return self.message_formatter.get_readonly_files_messages(
+            self.get_read_only_files_content,
+            self.get_images_message,
+            self.abs_read_only_fnames,
         )
 
-        # https://github.com/BerriAI/litellm/pull/6928
-        supports_pdfs = supports_pdfs or "claude-3-5-sonnet-20241022" in self.main_model.name
+    def get_chat_files_messages(self):
+        return self.message_formatter.get_chat_files_messages(
+            self.abs_fnames,
+            self.get_files_content,
+            self.get_repo_map,
+            self.get_images_message,
+        )
 
-        if not (supports_images or supports_pdfs):
-            return None
-
-        image_messages = []
-        for fname in fnames:
-            if not is_image_file(fname):
-                continue
-
-            mime_type, _ = mimetypes.guess_type(fname)
-            if not mime_type:
-                continue
-
-            with open(fname, "rb") as image_file:
-                encoded_string = base64.b64encode(image_file.read()).decode("utf-8")
-            image_url = f"data:{mime_type};base64,{encoded_string}"
-            rel_fname = self.get_rel_fname(fname)
-
-            if mime_type.startswith("image/") and supports_images:
-                image_messages += [
-                    {"type": "text", "text": f"Image file: {rel_fname}"},
-                    {"type": "image_url", "image_url": {"url": image_url, "detail": "high"}},
-                ]
-            elif mime_type == "application/pdf" and supports_pdfs:
-                image_messages += [
-                    {"type": "text", "text": f"PDF file: {rel_fname}"},
-                    {"type": "image_url", "image_url": image_url},
-                ]
-
-        if not image_messages:
-            return None
-
-        return {"role": "user", "content": image_messages}
+    def get_images_message(self, fnames):
+        return self.message_formatter.get_images_message(fnames, self.get_rel_fname)
 
     def run_stream(self, user_message):
         self.io.user_input(user_message)
@@ -1159,170 +1075,34 @@ class Coder:
         )
 
     def fmt_system_prompt(self, prompt):
-        final_reminders = []
-        if self.main_model.lazy:
-            final_reminders.append(self.gpt_prompts.lazy_prompt)
-        if self.main_model.overeager:
-            final_reminders.append(self.gpt_prompts.overeager_prompt)
-
-        user_lang = self.get_user_language()
-        if user_lang:
-            final_reminders.append(f"Reply in {user_lang}.\n")
-
-        platform_text = self.get_platform_info()
-
-        if self.suggest_shell_commands:
-            shell_cmd_prompt = self.gpt_prompts.shell_cmd_prompt.format(platform=platform_text)
-            shell_cmd_reminder = self.gpt_prompts.shell_cmd_reminder.format(platform=platform_text)
-            rename_with_shell = self.gpt_prompts.rename_with_shell
-        else:
-            shell_cmd_prompt = self.gpt_prompts.no_shell_cmd_prompt.format(platform=platform_text)
-            shell_cmd_reminder = self.gpt_prompts.no_shell_cmd_reminder.format(
-                platform=platform_text
-            )
-            rename_with_shell = ""
-
-        if user_lang:  # user_lang is the result of self.get_user_language()
-            language = user_lang
-        else:
-            language = "the same language they are using"  # Default if no specific lang detected
-
-        if self.fence[0] == "`" * 4:
-            quad_backtick_reminder = (
-                "\nIMPORTANT: Use *quadruple* backticks ```` as fences, not triple backticks!\n"
-            )
-        else:
-            quad_backtick_reminder = ""
-
-        final_reminders = "\n\n".join(final_reminders)
-
-        prompt = prompt.format(
-            fence=self.fence,
-            quad_backtick_reminder=quad_backtick_reminder,
-            final_reminders=final_reminders,
-            platform=platform_text,
-            shell_cmd_prompt=shell_cmd_prompt,
-            rename_with_shell=rename_with_shell,
-            shell_cmd_reminder=shell_cmd_reminder,
-            go_ahead_tip=self.gpt_prompts.go_ahead_tip,
-            language=language,
+        return self.message_formatter.fmt_system_prompt(
+            prompt,
+            self.fence,
+            self.get_user_language,
+            self.get_platform_info,
+            self.suggest_shell_commands,
         )
 
-        return prompt
-
     def format_chat_chunks(self):
-        self.choose_fence()
-        main_sys = self.fmt_system_prompt(self.gpt_prompts.main_system)
-        if self.main_model.system_prompt_prefix:
-            main_sys = self.main_model.system_prompt_prefix + "\n" + main_sys
-
-        example_messages = []
-        if self.main_model.examples_as_sys_msg:
-            if self.gpt_prompts.example_messages:
-                main_sys += "\n# Example conversations:\n\n"
-            for msg in self.gpt_prompts.example_messages:
-                role = msg["role"]
-                content = self.fmt_system_prompt(msg["content"])
-                main_sys += f"## {role.upper()}: {content}\n\n"
-            main_sys = main_sys.strip()
-        else:
-            for msg in self.gpt_prompts.example_messages:
-                example_messages.append(
-                    dict(
-                        role=msg["role"],
-                        content=self.fmt_system_prompt(msg["content"]),
-                    )
-                )
-            if self.gpt_prompts.example_messages:
-                example_messages += [
-                    dict(
-                        role="user",
-                        content=(
-                            "I switched to a new code base. Please don't consider the above files"
-                            " or try to edit them any longer."
-                        ),
-                    ),
-                    dict(role="assistant", content="Ok."),
-                ]
-
-        if self.gpt_prompts.system_reminder:
-            main_sys += "\n" + self.fmt_system_prompt(self.gpt_prompts.system_reminder)
-
-        chunks = ChatChunks()
-
-        if self.main_model.use_system_prompt:
-            chunks.system = [
-                dict(role="system", content=main_sys),
-            ]
-        else:
-            chunks.system = [
-                dict(role="user", content=main_sys),
-                dict(role="assistant", content="Ok."),
-            ]
-
-        chunks.examples = example_messages
-
-        self.summarize_end()
-        chunks.done = self.done_messages
-
-        chunks.repo = self.get_repo_messages()
-        chunks.readonly_files = self.get_readonly_files_messages()
-        chunks.chat_files = self.get_chat_files_messages()
-
-        if self.gpt_prompts.system_reminder:
-            reminder_message = [
-                dict(
-                    role="system", content=self.fmt_system_prompt(self.gpt_prompts.system_reminder)
-                ),
-            ]
-        else:
-            reminder_message = []
-
-        chunks.cur = list(self.cur_messages)
-        chunks.reminder = []
-
-        # TODO review impact of token count on image messages
-        messages_tokens = self.main_model.token_count(chunks.all_messages())
-        reminder_tokens = self.main_model.token_count(reminder_message)
-        cur_tokens = self.main_model.token_count(chunks.cur)
-
-        if None not in (messages_tokens, reminder_tokens, cur_tokens):
-            total_tokens = messages_tokens + reminder_tokens + cur_tokens
-        else:
-            # add the reminder anyway
-            total_tokens = 0
-
-        if chunks.cur:
-            final = chunks.cur[-1]
-        else:
-            final = None
-
-        max_input_tokens = self.main_model.info.get("max_input_tokens") or 0
-        # Add the reminder prompt if we still have room to include it.
-        if (
-            not max_input_tokens
-            or total_tokens < max_input_tokens
-            and self.gpt_prompts.system_reminder
-        ):
-            if self.main_model.reminder == "sys":
-                chunks.reminder = reminder_message
-            elif self.main_model.reminder == "user" and final and final["role"] == "user":
-                # stuff it into the user message
-                new_content = (
-                    final["content"]
-                    + "\n\n"
-                    + self.fmt_system_prompt(self.gpt_prompts.system_reminder)
-                )
-                chunks.cur[-1] = dict(role=final["role"], content=new_content)
-
-        return chunks
+        return self.message_formatter.format_chat_chunks(
+            self.choose_fence,
+            self.fence,
+            self.get_user_language,
+            self.get_platform_info,
+            self.suggest_shell_commands,
+            self.done_messages,
+            self.get_repo_messages,
+            self.get_readonly_files_messages,
+            self.get_chat_files_messages,
+            self.cur_messages,
+            self.summarize_end,
+            self.add_cache_headers,
+        )
 
     def format_messages(self):
-        chunks = self.format_chat_chunks()
-        if self.add_cache_headers:
-            chunks.add_cache_control_headers()
-
-        return chunks
+        return self.message_formatter.format_messages(
+            self.format_chat_chunks, self.add_cache_headers
+        )
 
     def warm_cache(self, chunks):
         if not self.add_cache_headers:
