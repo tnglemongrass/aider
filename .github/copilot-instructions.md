@@ -130,7 +130,7 @@ pip install pip-tools
 
 - GitHub Actions workflows in `.github/workflows/`
 - Tests run on Ubuntu and Windows
-- Tests run for Python 3.9-3.12 on CI
+- Tests run for Python 3.10-3.12 on CI
 - Docker build and test workflow available
 - Workflows ignore changes to `aider/website/**` and `README.md`
 
