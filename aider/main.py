@@ -755,6 +755,18 @@ def main(argv=None, input=None, output=None, force_git_root=None, return_coder=F
 
     register_models(git_root, args.model_settings_file, io, verbose=args.verbose)
     register_litellm_models(git_root, args.model_metadata_file, io, verbose=args.verbose)
+    models_endpoint = args.models_endpoint
+    if not models_endpoint and args.openai_api_base:
+        models_endpoint = args.openai_api_base.rstrip("/") + "/models"
+    if models_endpoint:
+        try:
+            discovered_models = models.register_models_from_endpoint(
+                models_endpoint, verify_ssl=args.verify_ssl, timeout=args.timeout
+            )
+            if args.verbose and discovered_models:
+                io.tool_output(f"Loaded {len(discovered_models)} models from {models_endpoint}")
+        except Exception as err:
+            io.tool_warning(f"Failed to load models from {models_endpoint}: {err}")
 
     if args.list_models:
         models.print_matching_models(io, args.list_models)

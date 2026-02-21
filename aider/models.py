@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Optional, Union
 
 import json5
+import requests
 import yaml
 from PIL import Image
 
@@ -1116,6 +1117,51 @@ def register_litellm_models(model_fnames):
         files_loaded.append(model_fname)
 
     return files_loaded
+
+
+def register_models_from_endpoint(endpoint_url, verify_ssl=True, timeout=None):
+    if not endpoint_url:
+        return []
+
+    timeout = timeout if timeout is not None else 5
+    model_timeout = max(1, min(timeout, 30))
+
+    response = requests.get(endpoint_url, timeout=model_timeout, verify=verify_ssl)
+    response.raise_for_status()
+    data = response.json()
+
+    if isinstance(data, dict):
+        models_data = data.get("data")
+        if models_data is None:
+            models_data = data.get("models", [])
+    elif isinstance(data, list):
+        models_data = data
+    else:
+        models_data = []
+
+    discovered = set()
+    for item in models_data:
+        model_name = None
+        if isinstance(item, str):
+            model_name = item
+        elif isinstance(item, dict):
+            model_name = item.get("id") or item.get("model") or item.get("name")
+
+        if not model_name:
+            continue
+
+        model_name = str(model_name).strip()
+        if not model_name:
+            continue
+
+        provider = model_name.split("/", 1)[0] if "/" in model_name else "custom"
+        model_info = model_info_manager.local_model_metadata.get(model_name, {})
+        model_info["mode"] = model_info.get("mode", "chat")
+        model_info["litellm_provider"] = model_info.get("litellm_provider", provider)
+        model_info_manager.local_model_metadata[model_name] = model_info
+        discovered.add(model_name)
+
+    return sorted(discovered)
 
 
 def validate_variables(vars):

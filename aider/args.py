@@ -130,6 +130,12 @@ def get_parser(default_config_files, git_root):
         help="Specify a file with context window and costs for unknown models",
     ).complete = shtab.FILE
     group.add_argument(
+        "--models-endpoint",
+        metavar="MODELS_ENDPOINT",
+        default=None,
+        help="Load available models from an OpenAI-compatible /models endpoint",
+    )
+    group.add_argument(
         "--alias",
         action="append",
         metavar="ALIAS:MODEL",
