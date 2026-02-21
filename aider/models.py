@@ -1124,11 +1124,14 @@ def register_models_from_endpoint(endpoint_url, verify_ssl=True, timeout=None):
         return []
 
     timeout = timeout if timeout is not None else 5
-    model_timeout = max(1, min(timeout, 30))
+    endpoint_timeout = max(1, min(timeout, 30))
 
-    response = requests.get(endpoint_url, timeout=model_timeout, verify=verify_ssl)
-    response.raise_for_status()
-    data = response.json()
+    try:
+        response = requests.get(endpoint_url, timeout=endpoint_timeout, verify=verify_ssl)
+        response.raise_for_status()
+        data = response.json()
+    except Exception as err:
+        raise ValueError(f"Unable to fetch models from {endpoint_url}: {err}") from err
 
     if isinstance(data, dict):
         models_data = data.get("data")
