@@ -1260,6 +1260,33 @@ class TestMain(TestCase):
                 # Check that both models appear in the output
                 self.assertIn("test-provider/metadata-only-model", output)
 
+    @patch("aider.models.requests.get")
+    def test_list_models_includes_models_endpoint_models(self, mock_get):
+        endpoint_model = "custom/zz-endpoint-model-issue-19"
+        mock_response = MagicMock()
+        mock_response.raise_for_status.return_value = None
+        mock_response.json.return_value = {"data": [{"id": endpoint_model}]}
+        mock_get.return_value = mock_response
+
+        with GitTemporaryDirectory():
+            with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
+                main(
+                    [
+                        "--list-models",
+                        "zz-endpoint-model-issue-19",
+                        "--models-endpoint",
+                        "https://example.test/v1/models",
+                        "--yes",
+                        "--no-gitignore",
+                    ],
+                    input=DummyInput(),
+                    output=DummyOutput(),
+                )
+                output = mock_stdout.getvalue()
+
+        self.assertIn(endpoint_model, output)
+        mock_get.assert_called_once_with("https://example.test/v1/models", timeout=5, verify=True)
+
     def test_check_model_accepts_settings_flag(self):
         # Test that --check-model-accepts-settings affects whether settings are applied
         with GitTemporaryDirectory():
