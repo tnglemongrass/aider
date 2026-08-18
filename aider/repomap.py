@@ -11,12 +11,9 @@ from collections import Counter, defaultdict, namedtuple
 from importlib import resources
 from pathlib import Path
 
-from diskcache import Cache
-from grep_ast import TreeContext, filename_to_lang
 from pygments.lexers import guess_lexer_for_filename
 from pygments.token import Token
 from tqdm import tqdm
-from tree_sitter import Query
 
 from aider.dump import dump
 from aider.special import filter_important_files
@@ -24,7 +21,24 @@ from aider.waiting import Spinner
 
 # tree_sitter is throwing a FutureWarning
 warnings.simplefilter("ignore", category=FutureWarning)
-from grep_ast.tsl import USING_TSL_PACK, get_language, get_parser  # noqa: E402
+
+try:
+    from grep_ast import TreeContext, filename_to_lang
+    from grep_ast.tsl import USING_TSL_PACK, get_language, get_parser  # noqa: E402
+    from tree_sitter import Query
+
+    from diskcache import Cache
+
+    HAVE_TREE_SITTER = True
+except (ImportError, ModuleNotFoundError):
+    Cache = None
+    TreeContext = None
+    Query = None
+    filename_to_lang = None
+    get_language = None
+    get_parser = None
+    USING_TSL_PACK = False
+    HAVE_TREE_SITTER = False
 
 Tag = namedtuple("Tag", "rel_fname fname line name kind".split())
 
@@ -37,6 +51,8 @@ if USING_TSL_PACK:
     CACHE_VERSION = 4
 
 UPDATING_REPO_MAP_MESSAGE = "Updating repo map"
+
+LINT_EXTRA_INSTALL_HINT = "Install with: pip install 'aider-chat[lint]'"
 
 
 class RepoMap:
@@ -109,6 +125,12 @@ class RepoMap:
         force_refresh=False,
     ):
         if self.max_map_tokens <= 0:
+            return
+        if not HAVE_TREE_SITTER:
+            self.io.tool_warning(
+                f"Repo map disabled, tree-sitter is not installed. {LINT_EXTRA_INSTALL_HINT}"
+            )
+            self.max_map_tokens = 0
             return
         if not other_files:
             return
@@ -183,6 +205,10 @@ class RepoMap:
         if isinstance(getattr(self, "TAGS_CACHE", None), dict):
             return
 
+        if Cache is None:
+            self.TAGS_CACHE = dict()
+            return
+
         path = Path(self.root) / self.TAGS_CACHE_DIR
 
         # Try to recreate the cache
@@ -215,6 +241,9 @@ class RepoMap:
         self.TAGS_CACHE = dict()
 
     def load_tags_cache(self):
+        if Cache is None:
+            self.TAGS_CACHE = dict()
+            return
         path = Path(self.root) / self.TAGS_CACHE_DIR
         try:
             self.TAGS_CACHE = Cache(path)
@@ -365,7 +394,13 @@ class RepoMap:
     def get_ranked_tags(
         self, chat_fnames, other_fnames, mentioned_fnames, mentioned_idents, progress=None
     ):
-        import networkx as nx
+        try:
+            import networkx as nx
+        except ImportError:
+            self.io.tool_warning(
+                f"Repo map disabled, networkx is not installed. {LINT_EXTRA_INSTALL_HINT}"
+            )
+            return []
 
         defines = defaultdict(set)
         references = defaultdict(list)
@@ -830,6 +865,9 @@ def get_scm_fname(lang):
 
 
 def get_supported_languages_md():
+    if not HAVE_TREE_SITTER:
+        return ""
+
     from grep_ast.parsers import PARSERS
 
     res = """

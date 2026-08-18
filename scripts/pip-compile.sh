@@ -21,16 +21,12 @@ uv pip compile \
     $VERBOSITY \
     --no-strip-extras \
     --constraint=requirements/common-constraints.txt \
-    --output-file=tmp.requirements.txt \
+    --output-file=requirements.txt \
     requirements/requirements.in \
     $1
 
-grep -Ev '^(tree-sitter|numpy|scipy)=' tmp.requirements.txt \
-    | cat - requirements/tree-sitter.in requirements/python-compat.in \
-    > requirements.txt
-
 # Compile additional requirements files
-SUFFIXES=(dev help browser playwright voice)
+SUFFIXES=(dev help browser playwright voice lint)
 
 for SUFFIX in "${SUFFIXES[@]}"; do
     uv pip compile \

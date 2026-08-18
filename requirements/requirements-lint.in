@@ -1,0 +1,22 @@
+grep_ast
+flake8
+diskcache
+
+# The proper dependency is networkx[default], but this brings
+# in matplotlib and a bunch of other deps
+# https://github.com/networkx/networkx/blob/d7132daa8588f653eacac7a5bae1ee85a183fa43/pyproject.toml#L57
+# We really only need networkx itself and scipy for the repomap.
+#
+# >3.5 seems to not be available for py3.10
+networkx<3.5
+
+# NumPy 2.x adds Python 3.14 wheels, but dropped Python 3.10.
+numpy<2; python_version < "3.11"
+numpy>=2.3,<2.5; python_version >= "3.11"
+
+# SciPy 1.16+ adds Python 3.14 wheels, but dropped Python 3.10.
+scipy<1.16; python_version < "3.11"
+scipy>=1.16.1,<1.18; python_version >= "3.11"
+
+tree-sitter==0.23.2; python_version < "3.10"
+tree-sitter==0.25.2; python_version >= "3.10"

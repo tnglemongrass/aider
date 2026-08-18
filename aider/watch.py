@@ -3,7 +3,10 @@ import threading
 from pathlib import Path
 from typing import Optional
 
-from grep_ast import TreeContext
+try:
+    from grep_ast import TreeContext
+except (ImportError, ModuleNotFoundError):
+    TreeContext = None
 from pathspec import PathSpec
 from pathspec.patterns import GitWildMatchPattern
 from watchfiles import watch
@@ -230,6 +233,11 @@ class FileWatcher:
 
             # Convert comment line numbers to line indices (0-based)
             lois = [ln - 1 for ln, _ in zip(line_nums, comments) if ln > 0]
+
+            if TreeContext is None:
+                for ln, comment in zip(line_nums, comments):
+                    res += f"  Line {ln}: {comment}\n"
+                continue
 
             try:
                 context = TreeContext(

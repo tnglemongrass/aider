@@ -8,8 +8,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import oslex
-from grep_ast import TreeContext, filename_to_lang
-from grep_ast.tsl import get_parser  # noqa: E402
 
 from aider.dump import dump  # noqa: F401
 from aider.run_cmd import run_cmd_subprocess  # noqa: F401
@@ -17,8 +15,23 @@ from aider.run_cmd import run_cmd_subprocess  # noqa: F401
 # tree_sitter is throwing a FutureWarning
 warnings.simplefilter("ignore", category=FutureWarning)
 
+try:
+    from grep_ast import TreeContext, filename_to_lang
+    from grep_ast.tsl import get_parser  # noqa: E402
+
+    HAVE_TREE_SITTER = True
+except (ImportError, ModuleNotFoundError):
+    TreeContext = None
+    filename_to_lang = None
+    get_parser = None
+    HAVE_TREE_SITTER = False
+
+LINT_EXTRA_INSTALL_HINT = "Install with: pip install 'aider-chat[lint]'"
+
 
 class Linter:
+    warned_missing = set()
+
     def __init__(self, encoding="utf-8", root=None):
         self.encoding = encoding
         self.root = root
@@ -90,9 +103,12 @@ class Linter:
         if cmd:
             cmd = cmd.strip()
         if not cmd:
-            lang = filename_to_lang(fname)
-            if not lang:
-                return
+            if HAVE_TREE_SITTER:
+                lang = filename_to_lang(fname)
+                if not lang:
+                    return
+            else:
+                lang = None
             if self.all_lint_cmd:
                 cmd = self.all_lint_cmd
             else:
@@ -134,6 +150,19 @@ class Linter:
             return LintResult(text, lines)
 
     def flake8_lint(self, rel_fname):
+        try:
+            from importlib.util import find_spec
+        except ImportError:
+            return
+        if find_spec("flake8") is None:
+            if "flake8" not in Linter.warned_missing:
+                Linter.warned_missing.add("flake8")
+                print(
+                    "Skipping flake8 linting, flake8 is not installed. "
+                    + LINT_EXTRA_INSTALL_HINT
+                )
+            return
+
         fatal = "E9,F821,F823,F831,F406,F407,F701,F702,F704,F706"
         flake8_cmd = [
             sys.executable,
@@ -203,6 +232,9 @@ def basic_lint(fname, code):
     Use tree-sitter to look for syntax errors, display them with tree context.
     """
 
+    if not HAVE_TREE_SITTER:
+        return
+
     lang = filename_to_lang(fname)
     if not lang:
         return
@@ -232,6 +264,9 @@ def basic_lint(fname, code):
 
 
 def tree_context(fname, code, line_nums):
+    if TreeContext is None:
+        return ""
+
     context = TreeContext(
         fname,
         code,
