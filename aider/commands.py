@@ -1263,6 +1263,7 @@ class Commands:
             except voice.SoundDeviceError:
                 self.io.tool_error(
                     "Unable to import `sounddevice` and/or `soundfile`, is portaudio installed?"
+                    " Install the voice dependencies with: pip install 'aider-chat[voice]'"
                 )
                 return
 

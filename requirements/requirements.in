@@ -1,4 +1,3 @@
-pydub
 configargparse
 GitPython
 jsonschema
@@ -9,8 +8,6 @@ pathspec
 diskcache
 grep_ast
 packaging
-sounddevice
-soundfile
 beautifulsoup4
 PyYAML
 diff-match-patch

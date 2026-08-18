@@ -17,8 +17,11 @@ warnings.filterwarnings(
 warnings.filterwarnings("ignore", category=SyntaxWarning)
 
 
-from pydub import AudioSegment  # noqa
-from pydub.exceptions import CouldntDecodeError, CouldntEncodeError  # noqa
+try:
+    from pydub import AudioSegment  # noqa
+    from pydub.exceptions import CouldntDecodeError, CouldntEncodeError  # noqa
+except ImportError:
+    AudioSegment = None
 
 try:
     import soundfile as sf
@@ -151,6 +154,12 @@ class Voice:
 
         filename = temp_wav
         if use_audio_format != "wav":
+            if AudioSegment is None:
+                print(
+                    "Error converting audio: pydub is not installed. "
+                    "Install it with: pip install 'aider-chat[voice]'"
+                )
+                return
             try:
                 new_filename = tempfile.mktemp(suffix=f".{use_audio_format}")
                 audio = AudioSegment.from_wav(temp_wav)
