@@ -161,6 +161,18 @@ def get_parser(default_config_files, git_root):
         help="Timeout in seconds for API calls (default: None)",
     )
     group.add_argument(
+        "--max-tokens",
+        type=int,
+        default=None,
+        help="Maximum tokens for model output (can also be set via MAX_TOKENS env var)",
+    )
+    group.add_argument(
+        "--use-litellm",
+        action="store_true",
+        default=False,
+        help="Use litellm library instead of the built-in SimpleLLM provider (default: False)",
+    )
+    group.add_argument(
         "--edit-format",
         "--chat-mode",
         metavar="EDIT_FORMAT",
