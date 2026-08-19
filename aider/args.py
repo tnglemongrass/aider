@@ -74,6 +74,10 @@ def get_parser(default_config_files, git_root):
         help="Specify the Anthropic API key",
     )
     group.add_argument(
+        "--openrouter-api-key",
+        help="Specify the OpenRouter API key",
+    )
+    group.add_argument(
         "--openai-api-base",
         help="Specify the api base url",
     )
@@ -240,6 +244,12 @@ def get_parser(default_config_files, git_root):
         type=int,
         default=0,
         help="Number of times to ping at 5min intervals to keep prompt cache warm (default: 0)",
+    )
+    group.add_argument(
+        "--cache-keepalive-delay",
+        type=float,
+        default=None,
+        help="Delay in seconds between cache keepalive pings (default: 295 seconds, ~5 minutes)",
     )
 
     ##########
@@ -595,6 +605,11 @@ def get_parser(default_config_files, git_root):
 
     #########
     group = parser.add_argument_group("Upgrading")
+    group.add_argument(
+        "--docker-image",
+        metavar="DOCKER_IMAGE",
+        help="Specify the Docker image name for upgrade instructions (auto-detected if running in Docker)",
+    )
     group.add_argument(
         "--just-check-update",
         action="store_true",
