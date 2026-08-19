@@ -298,6 +298,85 @@ class TestOnboarding(unittest.TestCase):
         mock_try_select.assert_not_called()
         mock_offer_oauth.assert_not_called()
 
+    @patch("aider.onboarding.try_to_select_default_model", return_value=None)
+    @patch("aider.onboarding.offer_openrouter_oauth")
+    @patch.dict(os.environ, {"OPENAI_MODEL": "custom-model"}, clear=True)
+    def test_select_default_model_from_openai_model_env_var(self, mock_offer_oauth, mock_try_select):
+        """Test select_default_model returns model from OPENAI_MODEL env var with auto-prefix."""
+        args = argparse.Namespace(model=None)
+        io_mock = DummyIO()
+        io_mock.tool_warning = MagicMock()
+        analytics_mock = DummyAnalytics()
+        analytics_mock.event = MagicMock()
+        
+        selected_model = select_default_model(args, io_mock, analytics_mock)
+        
+        # Should auto-add openai/ prefix
+        self.assertEqual(selected_model, "openai/custom-model")
+        mock_try_select.assert_not_called()
+        io_mock.tool_warning.assert_called_once_with(
+            "Using openai/custom-model model from OPENAI_MODEL environment variable."
+        )
+        analytics_mock.event.assert_called_once_with("model_from_env", model="openai/custom-model")
+        mock_offer_oauth.assert_not_called()
+
+    @patch("aider.onboarding.try_to_select_default_model", return_value=None)
+    @patch("aider.onboarding.offer_openrouter_oauth")
+    @patch.dict(os.environ, {"OPENAI_MODEL": "openai/custom-model"}, clear=True)
+    def test_select_default_model_from_openai_model_env_var_with_prefix(self, mock_offer_oauth, mock_try_select):
+        """Test select_default_model handles OPENAI_MODEL that already has openai/ prefix."""
+        args = argparse.Namespace(model=None)
+        io_mock = DummyIO()
+        io_mock.tool_warning = MagicMock()
+        analytics_mock = DummyAnalytics()
+        analytics_mock.event = MagicMock()
+        
+        selected_model = select_default_model(args, io_mock, analytics_mock)
+        
+        # Should not double-add openai/ prefix
+        self.assertEqual(selected_model, "openai/custom-model")
+        mock_try_select.assert_not_called()
+        mock_offer_oauth.assert_not_called()
+
+    @patch("aider.onboarding.try_to_select_default_model", return_value="gpt-4o")
+    @patch("aider.onboarding.offer_openrouter_oauth")
+    @patch.dict(os.environ, {"OPENAI_MODEL": "   "}, clear=True)
+    def test_select_default_model_openai_model_env_var_empty_whitespace(self, mock_offer_oauth, mock_try_select):
+        """Test that empty/whitespace OPENAI_MODEL env var is ignored."""
+        args = argparse.Namespace(model=None)
+        io_mock = DummyIO()
+        io_mock.tool_warning = MagicMock()
+        analytics_mock = DummyAnalytics()
+        analytics_mock.event = MagicMock()
+        
+        selected_model = select_default_model(args, io_mock, analytics_mock)
+        
+        # Should fall through to try_to_select_default_model since OPENAI_MODEL is whitespace
+        self.assertEqual(selected_model, "gpt-4o")
+        mock_try_select.assert_called_once()
+        mock_offer_oauth.assert_not_called()
+
+    @patch("aider.onboarding.try_to_select_default_model", return_value=None)
+    @patch("aider.onboarding.offer_openrouter_oauth")
+    @patch.dict(os.environ, {"OPENAI_MODEL": "from-openai", "AIDER_MODEL": "openai/from-aider"}, clear=True)
+    def test_select_default_model_aider_model_takes_precedence(self, mock_offer_oauth, mock_try_select):
+        """Test that AIDER_MODEL takes precedence over OPENAI_MODEL env var."""
+        # When AIDER_MODEL is set, configargparse will set args.model to its value
+        args = argparse.Namespace(model="openai/from-aider")
+        io_mock = DummyIO()
+        io_mock.tool_warning = MagicMock()
+        analytics_mock = DummyAnalytics()
+        analytics_mock.event = MagicMock()
+        
+        selected_model = select_default_model(args, io_mock, analytics_mock)
+        
+        # AIDER_MODEL value should be returned, not OPENAI_MODEL value
+        self.assertEqual(selected_model, "openai/from-aider")
+        mock_try_select.assert_not_called()
+        mock_offer_oauth.assert_not_called()
+        # No warning should be shown since args.model is set
+        io_mock.tool_warning.assert_not_called()
+
     @patch("aider.onboarding.try_to_select_default_model", return_value="gpt-4o")
     @patch("aider.onboarding.offer_openrouter_oauth")
     def test_select_default_model_found_via_env(self, mock_offer_oauth, mock_try_select):
