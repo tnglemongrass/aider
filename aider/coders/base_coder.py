@@ -1370,7 +1370,7 @@ class Coder:
                 kwargs["max_tokens"] = 1
 
                 try:
-                    completion = litellm.completion(
+                    completion = self.main_model.completion(
                         model=self.main_model.name,
                         messages=self.cache_warming_chunks.cacheable_messages(),
                         stream=False,

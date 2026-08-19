@@ -7,7 +7,7 @@ import warnings
 
 from prompt_toolkit.shortcuts import prompt
 
-from aider.llm import litellm
+from aider.llm import litellm, use_openai_client
 
 from .dump import dump  # noqa: F401
 
@@ -175,9 +175,16 @@ class Voice:
 
         with open(filename, "rb") as fh:
             try:
-                transcript = litellm.transcription(
-                    model="whisper-1", file=fh, prompt=history, language=language
-                )
+                if use_openai_client():
+                    from aider import openai_client
+
+                    transcript = openai_client.transcription(
+                        model="whisper-1", file=fh, prompt=history, language=language
+                    )
+                else:
+                    transcript = litellm.transcription(
+                        model="whisper-1", file=fh, prompt=history, language=language
+                    )
             except Exception as err:
                 print(f"Unable to transcribe {filename}: {err}")
                 return

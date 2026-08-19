@@ -16,9 +16,9 @@ import json5
 import yaml
 from PIL import Image
 
-from aider import __version__
+from aider import __version__, openai_client
 from aider.dump import dump  # noqa: F401
-from aider.llm import litellm
+from aider.llm import litellm, use_openai_client
 from aider.openrouter import OpenRouterModelManager
 from aider.sendchat import ensure_alternating_roles, sanity_check_messages
 from aider.utils import check_pip_install_extra
@@ -250,6 +250,13 @@ class ModelInfoManager:
         cached_info = self.get_model_from_cached_json_db(model)
 
         litellm_info = None
+        if use_openai_client():
+            if not cached_info and model.startswith("openrouter/"):
+                openrouter_info = self.openrouter_manager.get_model_info(model)
+                if openrouter_info:
+                    return openrouter_info
+            return cached_info
+
         if litellm._lazy_module or not cached_info:
             try:
                 litellm_info = litellm.get_model_info(model)
@@ -645,11 +652,15 @@ class Model(ModelSettings):
         return self.editor_model
 
     def tokenizer(self, text):
+        if use_openai_client():
+            return openai_client.encode(model=self.name, text=text)
         return litellm.encode(model=self.name, text=text)
 
     def token_count(self, messages):
         if type(messages) is list:
             try:
+                if use_openai_client():
+                    return openai_client.token_counter(model=self.name, messages=messages)
                 return litellm.token_counter(model=self.name, messages=messages)
             except Exception as err:
                 print(f"Unable to count tokens: {err}")
@@ -748,6 +759,8 @@ class Model(ModelSettings):
         # https://github.com/BerriAI/litellm/issues/3190
 
         model = self.name
+        if use_openai_client():
+            return dict(keys_in_environment=[], missing_keys=[])
         res = litellm.validate_environment(model)
 
         # If missing AWS credential keys but AWS_PROFILE is set, consider AWS credentials valid
@@ -1033,8 +1046,13 @@ class Model(ModelSettings):
 
             self.github_copilot_token_to_open_ai_key(kwargs["extra_headers"])
 
-        res = litellm.completion(**kwargs)
+        res = self.completion(**kwargs)
         return hash_object, res
+
+    def completion(self, **kwargs):
+        if use_openai_client(self.name):
+            return openai_client.completion(**kwargs)
+        return litellm.completion(**kwargs)
 
     def simple_send_with_retries(self, messages):
         from aider.exceptions import LiteLLMExceptions
@@ -1228,7 +1246,10 @@ def fuzzy_match_models(name):
     name = name.lower()
 
     chat_models = set()
-    model_metadata = list(litellm.model_cost.items())
+    if use_openai_client():
+        model_metadata = []
+    else:
+        model_metadata = list(litellm.model_cost.items())
     model_metadata += list(model_info_manager.local_model_metadata.items())
 
     for orig_model, attrs in model_metadata:

@@ -26,7 +26,7 @@ uv pip compile \
     $1
 
 # Compile additional requirements files
-SUFFIXES=(dev help browser playwright voice lint)
+SUFFIXES=(dev help browser playwright voice lint litellm)
 
 for SUFFIX in "${SUFFIXES[@]}"; do
     uv pip compile \

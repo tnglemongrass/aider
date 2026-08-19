@@ -1,0 +1,8 @@
+# litellm provides support for non-OpenAI-compatible providers
+# (anthropic, gemini, ollama, bedrock, etc).
+litellm
+
+# The proper dependency is litellm[proxy], but it installs
+# mcp which is a pywin32 dependency that fails on linux CI.
+fastapi
+orjson

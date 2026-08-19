@@ -1,6 +1,7 @@
 import importlib
 import os
 import warnings
+from importlib.util import find_spec
 
 from aider.dump import dump  # noqa: F401
 
@@ -43,5 +44,30 @@ class LazyLiteLLM:
 
 
 litellm = LazyLiteLLM()
+
+
+def has_litellm():
+    """True if the litellm package is installed, without importing it."""
+    try:
+        return find_spec("litellm") is not None
+    except ValueError:
+        return False
+
+
+def use_openai_client(model=None):
+    """Use the built-in OpenAI-compatible client instead of litellm.
+
+    Without litellm installed we always use it. With litellm installed we
+    prefer it, unless the user points at an OpenAI-compatible endpoint via
+    OPENAI_API_BASE / OPENAI_API_HOST.
+    """
+    if not has_litellm():
+        return True
+    if os.environ.get("OPENAI_API_TYPE", "").lower() == "azure":
+        return False
+    if os.environ.get("OPENAI_API_BASE") or os.environ.get("OPENAI_API_HOST"):
+        return True
+    return False
+
 
 __all__ = [litellm]

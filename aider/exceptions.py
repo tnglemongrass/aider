@@ -62,21 +62,35 @@ class LiteLLMExceptions:
     exception_info = {exi.name: exi for exi in EXCEPTIONS}
 
     def __init__(self):
+        self.module = None
         self._load()
 
     def _load(self, strict=False):
-        import litellm
+        try:
+            import litellm
+        except ImportError:
+            if strict:
+                raise
+            from aider import openai_client
 
-        for var in dir(litellm):
+            mod = openai_client
+        else:
+            mod = litellm
+
+        self.module = mod
+
+        for var in dir(mod):
             # Filter by BaseException because instances of non-exception classes cannot be caught.
             # `litellm.ErrorEventError` is an example of a regular class which just happens to end
             # with `Error`.
-            if var.endswith("Error") and issubclass(getattr(litellm, var), BaseException):
+            if var.endswith("Error") and issubclass(getattr(mod, var), BaseException):
                 if var not in self.exception_info:
                     raise ValueError(f"{var} is in litellm but not in aider's exceptions list")
 
         for var in self.exception_info:
-            ex = getattr(litellm, var)
+            if not hasattr(mod, var):
+                continue
+            ex = getattr(mod, var)
             self.exceptions[ex] = self.exception_info[var]
 
     def exceptions_tuple(self):
@@ -84,9 +98,9 @@ class LiteLLMExceptions:
 
     def get_ex_info(self, ex):
         """Return the ExInfo for a given exception instance"""
-        import litellm
+        mod = self.module or self.exceptions
 
-        if ex.__class__ is litellm.APIConnectionError:
+        if ex.__class__ is getattr(mod, "APIConnectionError", type(None)):
             if "boto3" in str(ex):
                 return ExInfo("APIConnectionError", False, "You need to: pip install boto3")
             if "OpenrouterException" in str(ex) and "'choices'" in str(ex):
@@ -100,7 +114,7 @@ class LiteLLMExceptions:
                 )
 
         # Check for specific non-retryable APIError cases like insufficient credits
-        if ex.__class__ is litellm.APIError:
+        if ex.__class__ is getattr(mod, "APIError", type(None)):
             err_str = str(ex).lower()
             if "insufficient credits" in err_str and '"code":402' in err_str:
                 return ExInfo(
