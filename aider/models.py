@@ -1269,6 +1269,11 @@ def fuzzy_match_models(name):
         chat_models.add(fq_model)
         chat_models.add(orig_model)
 
+    if use_openai_client():
+        from aider import openai_client
+
+        chat_models.update(openai_client.model_list())
+
     chat_models = sorted(chat_models)
     # exactly matching model
     # matching_models = [

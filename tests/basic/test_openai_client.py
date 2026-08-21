@@ -204,3 +204,17 @@ def test_encode_fallback(monkeypatch):
     monkeypatch.setitem(sys.modules, "tiktoken", None)
     assert openai_client.encode("gpt-4o", "hello world") == [0] * 2
     assert len(openai_client.encode("unknown-model-xyz", "a" * 40)) == 10
+
+
+def test_model_list(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    data = {"data": [{"id": "model-b"}, {"id": "model-a"}, {"nope": 1}]}
+    with patch("aider.openai_client.httpx.get", return_value=FakeResponse(200, data)):
+        assert openai_client.model_list() == ["model-a", "model-b"]
+
+
+def test_model_list_error_returns_empty(monkeypatch):
+    with patch(
+        "aider.openai_client.httpx.get", return_value=FakeResponse(500, {"error": {}})
+    ):
+        assert openai_client.model_list() == []

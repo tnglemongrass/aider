@@ -193,6 +193,27 @@ class _Transcription:
             self.text = str(data)
 
 
+def model_list():
+    """Fetch available model ids from the endpoint's /models route."""
+    url = _base_url().rstrip("/") + "/models"
+    try:
+        resp = httpx.get(url, headers=_headers(), timeout=DEFAULT_TIMEOUT, verify=VERIFY_SSL)
+    except (httpx.TimeoutException, httpx.ConnectError):
+        return []
+    if resp.status_code != 200:
+        return []
+    try:
+        data = resp.json()
+    except Exception:
+        return []
+    models = data.get("data") if isinstance(data, dict) else None
+    if not isinstance(models, list):
+        return []
+    return sorted(
+        m["id"] for m in models if isinstance(m, dict) and isinstance(m.get("id"), str)
+    )
+
+
 def completion(
     model,
     messages,

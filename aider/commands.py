@@ -210,7 +210,9 @@ class Commands:
 
     def completions_model(self):
         if use_openai_client():
-            return []
+            from aider import openai_client
+
+            return openai_client.model_list()
         models = litellm.model_cost.keys()
         return models
 
