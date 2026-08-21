@@ -1,4 +1,11 @@
+import pytest
+
+from aider.capabilities import available
 from aider.exceptions import ExInfo, LiteLLMExceptions
+
+requires_litellm = pytest.mark.skipif(
+    not available("litellm"), reason="litellm is not installed"
+)
 
 
 def test_litellm_exceptions_load():
@@ -14,6 +21,7 @@ def test_exceptions_tuple():
     assert len(ex.exceptions_tuple()) > 0
 
 
+@requires_litellm
 def test_get_ex_info():
     """Test get_ex_info returns correct ExInfo"""
     ex = LiteLLMExceptions()
@@ -42,6 +50,7 @@ def test_get_ex_info():
     assert ex_info.description is None
 
 
+@requires_litellm
 def test_permission_denied_error():
     """Test specific handling of PermissionDeniedError"""
     ex = LiteLLMExceptions()
@@ -62,6 +71,7 @@ def test_permission_denied_error():
     assert "api key" in ex_info.description.lower()
 
 
+@requires_litellm
 def test_rate_limit_error():
     """Test specific handling of RateLimitError"""
     ex = LiteLLMExceptions()
@@ -73,6 +83,7 @@ def test_rate_limit_error():
     assert "rate limited" in ex_info.description.lower()
 
 
+@requires_litellm
 def test_context_window_error():
     """Test specific handling of ContextWindowExceededError"""
     ex = LiteLLMExceptions()
@@ -85,6 +96,7 @@ def test_context_window_error():
     assert ex_info.retry is False
 
 
+@requires_litellm
 def test_openrouter_error():
     """Test specific handling of OpenRouter API errors"""
     ex = LiteLLMExceptions()

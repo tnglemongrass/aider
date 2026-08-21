@@ -6,12 +6,13 @@ import sys
 import tempfile
 from io import StringIO
 from pathlib import Path
-from unittest import TestCase, mock
+from unittest import TestCase, mock, skipUnless
 
 import git
 import pyperclip
 
 from aider.coders import Coder
+from aider.capabilities import available
 from aider.commands import Commands, SwitchCoder
 from aider.dump import dump  # noqa: F401
 from aider.io import InputOutput
@@ -521,6 +522,7 @@ class TestCommands(TestCase):
 
             self.assertIn(str(fname.resolve()), coder.abs_fnames)
 
+    @skipUnless(available("repomap"), "repo map dependencies are not installed")
     def test_cmd_tokens_output(self):
         with GitTemporaryDirectory() as repo_dir:
             # Create a small repository with a few files

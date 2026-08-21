@@ -6,12 +6,19 @@ import unittest
 from pathlib import Path
 
 import git
+import pytest
 
+from aider import capabilities
 from aider.dump import dump  # noqa: F401
 from aider.io import InputOutput
 from aider.models import Model
 from aider.repomap import RepoMap
 from aider.utils import GitTemporaryDirectory, IgnorantTemporaryDirectory
+
+pytestmark = pytest.mark.skipif(
+    not capabilities.available("repomap"),
+    reason="repo map dependencies (grep_ast/networkx) are not installed",
+)
 
 
 class TestRepoMap(unittest.TestCase):

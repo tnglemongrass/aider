@@ -2,10 +2,13 @@ import os
 import queue
 from unittest.mock import MagicMock, patch
 
-import numpy as np
 import pytest
 
-from aider.voice import SoundDeviceError, Voice
+pytest.importorskip("numpy", reason="numpy (voice extra) is not installed")
+
+import numpy as np  # noqa: E402
+
+from aider.voice import SoundDeviceError, Voice  # noqa: E402
 
 
 # Mock the entire sounddevice module

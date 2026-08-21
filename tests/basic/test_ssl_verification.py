@@ -1,7 +1,8 @@
 import os
-from unittest import TestCase
+from unittest import TestCase, skipUnless
 from unittest.mock import MagicMock, patch
 
+from aider.capabilities import available
 from prompt_toolkit.input import DummyInput
 from prompt_toolkit.output import DummyOutput
 
@@ -25,6 +26,7 @@ class TestSSLVerification(TestCase):
     @patch("httpx.Client")
     @patch("httpx.AsyncClient")
     @patch("aider.models.fuzzy_match_models", return_value=[])
+    @skipUnless(available("litellm"), "litellm is not installed")
     def test_no_verify_ssl_flag_sets_model_info_manager(
         self,
         mock_fuzzy_match,

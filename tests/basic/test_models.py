@@ -1,6 +1,8 @@
 import unittest
 from unittest.mock import ANY, MagicMock, patch
 
+from aider.capabilities import available
+
 from aider.models import (
     ANTHROPIC_BETA_HEADER,
     Model,
@@ -424,6 +426,7 @@ class TestModels(unittest.TestCase):
 
     @patch("aider.models.litellm.completion")
     @patch.object(Model, "token_count")
+    @unittest.skipUnless(available("litellm"), "litellm is not installed")
     def test_ollama_num_ctx_set_when_missing(self, mock_token_count, mock_completion):
         mock_token_count.return_value = 1000
 
@@ -444,6 +447,7 @@ class TestModels(unittest.TestCase):
         )
 
     @patch("aider.models.litellm.completion")
+    @unittest.skipUnless(available("litellm"), "litellm is not installed")
     def test_ollama_uses_existing_num_ctx(self, mock_completion):
         model = Model("ollama/llama3")
         model.extra_params = {"num_ctx": 4096}
@@ -462,6 +466,7 @@ class TestModels(unittest.TestCase):
         )
 
     @patch("aider.models.litellm.completion")
+    @unittest.skipUnless(available("litellm"), "litellm is not installed")
     def test_non_ollama_no_num_ctx(self, mock_completion):
         model = Model("gpt-4")
         messages = [{"role": "user", "content": "Hello"}]
@@ -494,6 +499,7 @@ class TestModels(unittest.TestCase):
         self.assertEqual(model.use_temperature, 0.7)
 
     @patch("aider.models.litellm.completion")
+    @unittest.skipUnless(available("litellm"), "litellm is not installed")
     def test_request_timeout_default(self, mock_completion):
         # Test default timeout is used when not specified in extra_params
         model = Model("gpt-4")
@@ -508,6 +514,7 @@ class TestModels(unittest.TestCase):
         )
 
     @patch("aider.models.litellm.completion")
+    @unittest.skipUnless(available("litellm"), "litellm is not installed")
     def test_request_timeout_from_extra_params(self, mock_completion):
         # Test timeout from extra_params overrides default
         model = Model("gpt-4")
@@ -523,6 +530,7 @@ class TestModels(unittest.TestCase):
         )
 
     @patch("aider.models.litellm.completion")
+    @unittest.skipUnless(available("litellm"), "litellm is not installed")
     def test_use_temperature_in_send_completion(self, mock_completion):
         # Test use_temperature=True sends temperature=0
         model = Model("gpt-4")

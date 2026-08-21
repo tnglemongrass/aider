@@ -1,6 +1,8 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
+from aider.capabilities import available
+
 from aider.coders.base_coder import Coder
 from aider.dump import dump  # noqa
 from aider.io import InputOutput
@@ -580,6 +582,7 @@ End"""
             self.assertEqual(coder.partial_response_content.strip(), expected_content)
 
     @patch("aider.models.litellm.completion")
+    @unittest.skipUnless(available("litellm"), "litellm is not installed")
     def test_simple_send_with_retries_removes_reasoning(self, mock_completion):
         """Test that simple_send_with_retries correctly removes reasoning content."""
         model = Model("deepseek-r1")  # This model has reasoning_tag="think"

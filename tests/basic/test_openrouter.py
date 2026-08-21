@@ -1,5 +1,8 @@
 from pathlib import Path
 
+import pytest
+
+from aider.capabilities import available
 from aider.models import ModelInfoManager
 from aider.openrouter import OpenRouterModelManager
 
@@ -44,6 +47,7 @@ def test_openrouter_get_model_info_from_cache(monkeypatch, tmp_path):
     assert info["litellm_provider"] == "openrouter"
 
 
+@pytest.mark.skipif(not available("litellm"), reason="litellm is not installed")
 def test_model_info_manager_uses_openrouter_manager(monkeypatch):
     """
     ModelInfoManager should delegate to OpenRouterModelManager when litellm

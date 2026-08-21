@@ -1,7 +1,14 @@
 import os
 from unittest.mock import patch
 
+import pytest
+
+from aider.capabilities import available
 from aider.models import Model
+
+pytestmark = pytest.mark.skipif(
+    not available("litellm"), reason="litellm is not installed"
+)
 
 
 class TestAWSCredentials:
