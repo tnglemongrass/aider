@@ -64,22 +64,20 @@ Development setup:
 
 Running tests (feature-dependent tests skip themselves automatically):
 
-    python -m pytest tests/basic            # whatever is installed
-    python -m pytest tests/basic            # same command in a lite venv
+    python -m pytest tests/basic            # in a lite venv: only core deps
 
 Verifying both modes before committing (branch convention):
 
     python3 -m venv /tmp/lite && /tmp/lite/bin/pip install -e . pytest
-    python3 -m venv /tmp/full && /tmp/full/bin/pip install -e ".[lint,litellm,voice]" pytest
+    python3 -m venv /tmp/all && /tmp/all/bin/pip install -e ".[all]" pytest
+    /tmp/lite/bin/python -m pytest tests/basic      # lite
+    /tmp/all/bin/python -m pytest tests/basic       # all
 
 Rebuilding the pinned requirement files (requires [uv](https://docs.astral.sh/uv/)):
 
     scripts/pip-compile.sh
 
-Building a release:
+Building a (local) release:
 
     python -m build                         # sdist + wheel into dist/
     pip install dist/aider_chat-*.whl       # sanity-check the wheel
-
-Publishing runs through GitHub Actions (.github/workflows/release.yml);
-the version is derived from git tags via setuptools_scm.
