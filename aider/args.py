@@ -8,7 +8,7 @@ from pathlib import Path
 import configargparse
 import shtab
 
-from aider import __version__
+from aider import __version__, capabilities
 from aider.args_formatter import (
     DotEnvFormatter,
     MarkdownHelpFormatter,
@@ -17,6 +17,23 @@ from aider.args_formatter import (
 from aider.deprecated import add_deprecated_model_args
 
 from .dump import dump  # noqa: F401
+
+
+class CapabilityArgumentGroup:
+    """Argument group whose options vanish from --help when a capability is missing.
+
+    Options stay registered, so config files and environment variables that
+    reference them keep parsing without errors.
+    """
+
+    def __init__(self, parser, title, cap):
+        self._group = parser.add_argument_group(title)
+        self._hide = not capabilities.available(cap)
+
+    def add_argument(self, *args, **kwargs):
+        if self._hide:
+            kwargs["help"] = argparse.SUPPRESS
+        return self._group.add_argument(*args, **kwargs)
 
 
 def resolve_aiderignore_path(path_str, git_root=None):
@@ -243,7 +260,7 @@ def get_parser(default_config_files, git_root):
     )
 
     ##########
-    group = parser.add_argument_group("Repomap settings")
+    group = CapabilityArgumentGroup(parser, "Repomap settings", "repomap")
     group.add_argument(
         "--map-tokens",
         type=int,
@@ -697,7 +714,7 @@ def get_parser(default_config_files, git_root):
     )
 
     ##########
-    group = parser.add_argument_group("Voice settings")
+    group = CapabilityArgumentGroup(parser, "Voice settings", "voice")
     group.add_argument(
         "--voice-format",
         metavar="VOICE_FORMAT",
