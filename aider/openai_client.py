@@ -83,11 +83,11 @@ def _base_url():
     return "https://api.openai.com/v1"
 
 
-def _headers(extra_headers=None):
+def _headers(api_key=None, extra_headers=None):
     headers = {"Content-Type": "application/json"}
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if api_key:
-        headers["Authorization"] = f"Bearer {api_key}"
+    key = api_key or os.environ.get("OPENAI_API_KEY")
+    if key:
+        headers["Authorization"] = f"Bearer {key}"
     if extra_headers:
         headers.update(extra_headers)
     return headers
@@ -223,6 +223,8 @@ def completion(
     timeout=None,
     extra_headers=None,
     api_base=None,
+    api_key=None,
+    base_url=None,
     extra_body=None,
     **ignored,
 ):
@@ -233,8 +235,9 @@ def completion(
         payload["max_tokens"] = max_tokens
     if extra_body:
         payload.update(extra_body)
-    url = (api_base or _base_url()).rstrip("/") + "/chat/completions"
-    headers = _headers(extra_headers)
+    # litellm spells the endpoint override "base_url", we use "api_base".
+    url = (base_url or api_base or _base_url()).rstrip("/") + "/chat/completions"
+    headers = _headers(api_key, extra_headers)
     timeout = _timeout(timeout)
 
     if stream:

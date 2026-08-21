@@ -43,6 +43,41 @@ def test_completion_non_stream(monkeypatch):
     assert res.usage.completion_tokens == 1
 
 
+def test_completion_honors_api_key_and_base_url(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-env")
+    data = {"choices": [{"message": {"content": "hi"}, "finish_reason": "stop"}]}
+    with patch(
+        "aider.openai_client.httpx.post",
+        return_value=FakeResponse(200, data),
+    ) as mock_post:
+        openai_client.completion(
+            model="m",
+            messages=[{"role": "user", "content": "x"}],
+            api_key="sk-kwarg",
+            base_url="http://per-model:8000/v1",
+        )
+
+    kwargs = mock_post.call_args.kwargs
+    assert mock_post.call_args.args[0] == "http://per-model:8000/v1/chat/completions"
+    assert kwargs["headers"]["Authorization"] == "Bearer sk-kwarg"
+
+
+def test_completion_api_base_still_works():
+    data = {"choices": [{"message": {"content": "hi"}, "finish_reason": "stop"}]}
+    with patch(
+        "aider.openai_client.httpx.post",
+        return_value=FakeResponse(200, data),
+    ) as mock_post:
+        openai_client.completion(
+            model="m",
+            messages=[{"role": "user", "content": "x"}],
+            api_key="sk-kwarg",
+            api_base="http://alt:9000/v1",
+        )
+
+    assert mock_post.call_args.args[0] == "http://alt:9000/v1/chat/completions"
+
+
 def test_completion_stream(monkeypatch):
     chunks = [
         {"choices": [{"delta": {"content": "Hel"}}]},
