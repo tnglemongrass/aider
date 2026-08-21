@@ -1,3 +1,5 @@
+import argparse
+
 import pytest
 
 from aider import capabilities
@@ -58,3 +60,40 @@ def test_all_caps_have_extra_and_modules():
     for name, cap in capabilities.CAPS.items():
         assert cap.modules, name
         assert cap.extra.startswith("aider-chat["), name
+
+
+@pytest.fixture
+def parser():
+    from aider.args import get_parser
+
+    return get_parser([])
+
+
+def test_notice_silent_by_default(parser):
+    args = parser.parse_args([])
+    assert capabilities.explicit_notices(args, parser) == []
+
+
+def test_notice_on_explicit_map_tokens(parser):
+    args = parser.parse_args(["--map-tokens", "2048"])
+    notices = capabilities.explicit_notices(args, parser)
+    assert len(notices) == 1
+    assert "Repo map" in notices[0]
+    assert "aider-chat[lint]" in notices[0]
+
+
+def test_no_notice_for_explicit_zero(parser):
+    args = parser.parse_args(["--map-tokens", "0"])
+    assert capabilities.explicit_notices(args, parser) == []
+
+
+def test_notice_on_nondefault_refresh(parser, monkeypatch):
+    monkeypatch.setattr(capabilities, "available", lambda name: False)
+    args = parser.parse_args(["--map-refresh", "always"])
+    assert capabilities.explicit_notices(args, parser)
+
+
+def test_no_notice_when_available(parser, monkeypatch):
+    monkeypatch.setattr(capabilities, "available", lambda name: True)
+    args = parser.parse_args(["--map-tokens", "2048"])
+    assert capabilities.explicit_notices(args, parser) == []

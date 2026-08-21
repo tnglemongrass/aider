@@ -18,7 +18,7 @@ import shtab
 from dotenv import load_dotenv
 from prompt_toolkit.enums import EditingMode
 
-from aider import __version__, models, urls, utils
+from aider import __version__, capabilities, models, urls, utils
 from aider.analytics import Analytics
 from aider.args import get_parser
 from aider.coders import Coder
@@ -502,6 +502,9 @@ def main(argv=None, input=None, output=None, force_git_root=None, return_coder=F
 
     # Parse again to include any arguments that might have been defined in .env
     args = parser.parse_args(argv)
+
+    for notice in capabilities.explicit_notices(args, parser):
+        print(notice)
 
     if args.shell_completions:
         # Ensure parser.prog is set for shtab, though it should be by default

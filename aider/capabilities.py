@@ -10,27 +10,32 @@ import importlib.util
 
 
 class Capability:
-    def __init__(self, modules, extra):
+    def __init__(self, modules, extra, title):
         self.modules = tuple(modules)
         self.extra = extra
+        self.title = title
 
 
 CAPS = {
     "voice": Capability(
         modules=("pydub", "sounddevice", "soundfile"),
         extra="aider-chat[voice]",
+        title="Voice",
     ),
     "repomap": Capability(
         modules=("grep_ast", "networkx"),
         extra="aider-chat[lint]",
+        title="Repo map",
     ),
     "lint": Capability(
         modules=("grep_ast", "flake8"),
         extra="aider-chat[lint]",
+        title="Linting",
     ),
     "litellm": Capability(
         modules=("litellm",),
         extra="aider-chat[litellm]",
+        title="Multi-provider LLM support",
     ),
 }
 
@@ -57,3 +62,34 @@ def hint(name):
 def reset():
     """Forget cached probe results (e.g. after a runtime pip install)."""
     _checked.clear()
+
+
+# Command-line args whose non-default values signal that the user
+# explicitly wants a feature, even though it may not be installed.
+EXPLICIT_ARGS = {
+    "repomap": ("map_tokens", "map_refresh", "map_multiplier_no_files"),
+}
+
+
+def explicit_notices(args, parser):
+    """Warnings for features the user explicitly requested but which are unavailable.
+
+    A feature counts as requested only when one of its args was set to a
+    meaningful non-default value via command line / env / config file.
+    """
+    notices = []
+    for cap, attr_names in EXPLICIT_ARGS.items():
+        if available(cap):
+            continue
+        for attr in attr_names:
+            value = getattr(args, attr, None)
+            if not value:  # None/0/"" never signal an explicit request
+                continue
+            if value == parser.get_default(attr):
+                continue
+            notices.append(
+                f"{CAPS[cap].title} requested but its dependencies are not installed."
+                f" {hint(cap)}"
+            )
+            break
+    return notices
