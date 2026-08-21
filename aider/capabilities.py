@@ -52,3 +52,8 @@ def available(name):
 def hint(name):
     """Canonical install hint for a missing feature."""
     return f"Install with: pip install '{CAPS[name].extra}'"
+
+
+def reset():
+    """Forget cached probe results (e.g. after a runtime pip install)."""
+    _checked.clear()

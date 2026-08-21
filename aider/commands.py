@@ -1263,9 +1263,11 @@ class Commands:
                     audio_format=self.voice_format or "wav", device_name=self.voice_input_device
                 )
             except voice.SoundDeviceError:
+                from aider.capabilities import hint as cap_hint
+
                 self.io.tool_error(
-                    "Unable to import `sounddevice` and/or `soundfile`, is portaudio installed?"
-                    " Install the voice dependencies with: pip install 'aider-chat[voice]'"
+                    "Unable to import `sounddevice` and/or `soundfile`, is portaudio installed? "
+                    + cap_hint("voice")
                 )
                 return
 

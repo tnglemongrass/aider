@@ -15,6 +15,7 @@ from pygments.lexers import guess_lexer_for_filename
 from pygments.token import Token
 from tqdm import tqdm
 
+from aider.capabilities import hint as cap_hint
 from aider.dump import dump
 from aider.special import filter_important_files
 from aider.waiting import Spinner
@@ -52,7 +53,7 @@ if USING_TSL_PACK:
 
 UPDATING_REPO_MAP_MESSAGE = "Updating repo map"
 
-LINT_EXTRA_INSTALL_HINT = "Install with: pip install 'aider-chat[lint]'"
+LINT_EXTRA_INSTALL_HINT = cap_hint("repomap")
 
 
 class RepoMap:

@@ -9,6 +9,7 @@ from pathlib import Path
 
 import oslex
 
+from aider.capabilities import hint as cap_hint
 from aider.dump import dump  # noqa: F401
 from aider.run_cmd import run_cmd_subprocess  # noqa: F401
 
@@ -26,7 +27,7 @@ except (ImportError, ModuleNotFoundError):
     get_parser = None
     HAVE_TREE_SITTER = False
 
-LINT_EXTRA_INSTALL_HINT = "Install with: pip install 'aider-chat[lint]'"
+LINT_EXTRA_INSTALL_HINT = cap_hint("lint")
 
 
 class Linter:

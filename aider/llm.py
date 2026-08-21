@@ -1,7 +1,6 @@
 import importlib
 import os
 import warnings
-from importlib.util import find_spec
 
 from aider.dump import dump  # noqa: F401
 
@@ -48,10 +47,9 @@ litellm = LazyLiteLLM()
 
 def has_litellm():
     """True if the litellm package is installed, without importing it."""
-    try:
-        return find_spec("litellm") is not None
-    except ValueError:
-        return False
+    from aider.capabilities import available
+
+    return available("litellm")
 
 
 def use_openai_client(model=None):

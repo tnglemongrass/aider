@@ -155,10 +155,9 @@ class Voice:
         filename = temp_wav
         if use_audio_format != "wav":
             if AudioSegment is None:
-                print(
-                    "Error converting audio: pydub is not installed. "
-                    "Install it with: pip install 'aider-chat[voice]'"
-                )
+                from aider.capabilities import hint as cap_hint
+
+                print("Error converting audio: pydub is not installed. " + cap_hint("voice"))
                 return
             try:
                 new_filename = tempfile.mktemp(suffix=f".{use_audio_format}")
