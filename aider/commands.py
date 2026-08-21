@@ -13,7 +13,7 @@ from PIL import Image, ImageGrab
 from prompt_toolkit.completion import Completion, PathCompleter
 from prompt_toolkit.document import Document
 
-from aider import models, prompts, voice
+from aider import capabilities, models, prompts, voice
 from aider.editor import pipe_editor
 from aider.format_settings import format_settings
 from aider.help import Help, install_help_extra
@@ -25,6 +25,12 @@ from aider.scrape import Scraper, install_playwright
 from aider.utils import is_image_file
 
 from .dump import dump  # noqa: F401
+
+COMMAND_CAPS = {
+    "voice": "voice",
+    "map": "repomap",
+    "map-refresh": "repomap",
+}
 
 
 class SwitchCoder(Exception):
@@ -282,6 +288,9 @@ class Commands:
                 continue
             cmd = attr[4:]
             cmd = cmd.replace("_", "-")
+            cap = COMMAND_CAPS.get(cmd)
+            if cap and not capabilities.available(cap):
+                continue
             commands.append("/" + cmd)
 
         return commands
