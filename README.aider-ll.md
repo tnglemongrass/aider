@@ -5,16 +5,16 @@ chat, code editing and git commits against any OpenAI-compatible API.
 Model names can be listed/fuzzy-matched directly from your endpoint's
 `/models` route.
 
-Not included by default:
-- repository map + tree-sitter linting (grep-ast/networkx/scipy)
-- multi-provider LLM support (Anthropic, Gemini, Bedrock, ...) via litellm
-- voice input
+Not included by default (dependencies listed by installed size):
+- repository map + linting (tree-sitter/scipy/numpy/networkx)
+- voice input (numpy/soundfile/sounddevice/pydub)
+- other-provider support for Anthropic/Gemini/Bedrock/... (litellm)
 
-Unavailable features are simply hidden from `--help` and the command
-menu; if you explicitly request one, aider prints the exact command
+Unavailable features are hidden from `--help` and command menu;
+if you explicitly request one, aider prints the exact command
 to enable it. Basic Python syntax checking remains built in.
 
-Add only what you need:
+Add only what you need by installing the respective dependencies:
 
     pip install aider-chat[lint]      # repo map + tree-sitter linting
     pip install aider-chat[litellm]   # all LLM providers
