@@ -37,3 +37,19 @@ for SUFFIX in "${SUFFIXES[@]}"; do
         requirements/requirements-${SUFFIX}.in \
         $1
 done
+
+# Compile the aggregate "all" extra from the feature .in files.
+# Kept out of SUFFIXES (and the common-constraints glob above) because it
+# is a union of the others, not an independent source of requirements.
+uv pip compile \
+    $VERBOSITY \
+    --no-strip-extras \
+    --constraint=requirements/common-constraints.txt \
+    --output-file=requirements/requirements-all.txt \
+    requirements/requirements-lint.in \
+    requirements/requirements-litellm.in \
+    requirements/requirements-voice.in \
+    requirements/requirements-help.in \
+    requirements/requirements-browser.in \
+    requirements/requirements-playwright.in \
+    $1
