@@ -66,7 +66,7 @@ def test_all_caps_have_extra_and_modules():
 def parser():
     from aider.args import get_parser
 
-    return get_parser([])
+    return get_parser([], None)
 
 
 def test_notice_silent_by_default(parser):
@@ -74,7 +74,8 @@ def test_notice_silent_by_default(parser):
     assert capabilities.explicit_notices(args, parser) == []
 
 
-def test_notice_on_explicit_map_tokens(parser):
+def test_notice_on_explicit_map_tokens(parser, monkeypatch):
+    monkeypatch.setattr(capabilities, "available", lambda name: False)
     args = parser.parse_args(["--map-tokens", "2048"])
     notices = capabilities.explicit_notices(args, parser)
     assert len(notices) == 1
